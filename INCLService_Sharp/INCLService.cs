@@ -20,7 +20,7 @@ namespace INCLService_Sharp
         private const int MAX_FILE_SIZE_MB = 4;
         private const string TRACE_DIR = "LOG";
 
-        private static string INCLUDIS_HOME = string.Empty;
+        public static string INCLUDIS_HOME = string.Empty;
         private static readonly object CSLog = new object();
         
         public static string DBUser = "includis";
@@ -37,8 +37,8 @@ namespace INCLService_Sharp
 
         public INCLService()
         {
-            this.ServiceName = SERVICE_DISPLAY_NAME + DBUser.ToUpper();
-            this.DisplayName = SERVICE_DISPLAY_NAME + DBUser.ToUpper();
+            this.ServiceName = SERVICE_DISPLAY_NAME + (DBUser != null ? DBUser.ToUpper() : "");
+            this.DisplayName = SERVICE_DISPLAY_NAME + (DBUser != null ? DBUser.ToUpper() : "");
             this.CanPauseAndContinue = true;
             this.AutoLog = true;
             
@@ -88,27 +88,76 @@ namespace INCLService_Sharp
         }
 
         /// <summary>
-        /// Main service execution loop
+        /// Main service execution loop - 1:1 translation from Delphi
         /// </summary>
         private async Task ServiceExecute()
         {
+            string s = string.Empty;
+            
             try
             {
+                // CSLog := TCriticalSection.Create;
                 lastDBConnectStatus = true;
-                
-                WriteMessage("Compiled with switches: ", 0);
-                
+                s = string.Empty;
+
+                // Check compile switches - in C# we use conditional compilation symbols
+                #if INCL_ORA
+                    s += "INCL_ORA;";
+                #endif
+                #if ODAC
+                    s += "ODAC;";
+                #endif
+                #if INCL_MSADO
+                    s += "INCL_MSADO;";
+                #endif
+                #if TIMEMEAS
+                    s += "TIMEMEAS;";
+                #endif
+
+                WriteMessage("Compiled with switches: " + s, 0);
+
                 // Wait for database connection
-                while (!CheckDBVerbindung() && !terminated)
+                while (!Daten.Instance.Database.Connected && !terminated)
                 {
-                    if (!lastDBConnectStatus)
+                    // ServiceThread.ProcessRequests(False); - Not directly translatable in .NET
+                    
+                    if (CheckDBVerbindung())
                     {
-                        lastDBConnectStatus = false;
-                        WriteMessage("Database not available.", 0);
+                        try
+                        {
+                            WriteMessage("Connected.", 0);
+                            Daten.Instance.Database.Connected = false;
+                            Daten.Instance.Database.UserName = DBUser;
+                            Daten.Instance.Database.Password = DBPass;
+                            Daten.Instance.Database.Server = DBServer;
+                            #if INCLUDISDatabaseTyp == 1
+                                Daten.Instance.Database.InitialCatalog = DBInitialCatalog;
+                                Daten.Instance.Database.SqlProvider = DBProvider;
+                            #endif
+                            Daten.Instance.Database.Connected = true;
+                        }
+                        catch { }
+                    }
+
+                    if (!Daten.Instance.Database.Connected)
+                    {
+                        if (lastDBConnectStatus)
+                        {
+                            lastDBConnectStatus = false;
+                            WriteMessage("Database not available.", 0);
+                        }
+                    }
+                    else
+                    {
+                        if (!lastDBConnectStatus)
+                            lastDBConnectStatus = true;
                     }
                     
-                    WriteMessage("Wait 30 sec.", 0);
-                    await Task.Delay(30000);
+                    if (!Daten.Instance.Database.Connected && !terminated)
+                    {
+                        WriteMessage("Wait 30 sec.", 0);
+                        await Task.Delay(30000);
+                    }
                 }
 
                 if (terminated)
@@ -128,9 +177,9 @@ namespace INCLService_Sharp
 
                 while (!terminated)
                 {
-                    // Process requests
-                    await Task.Delay(1000);
+                    // ServiceThread.ProcessRequests(True); - Not directly translatable
                     
+                    // Check if S7MainOK and test every second if there was an error
                     if (!S7MainOK)
                     {
                         // An error occurred during execution, restart
@@ -151,6 +200,8 @@ namespace INCLService_Sharp
                         }
                         S7MainOK = true;
                     }
+                    
+                    await Task.Delay(1000);
                 }
             }
             catch (Exception ex)
@@ -160,47 +211,64 @@ namespace INCLService_Sharp
         }
 
         /// <summary>
-        /// Check database connection
+        /// Check database connection - 1:1 translation from Delphi
         /// </summary>
         private bool CheckDBVerbindung()
         {
             WriteMessage("Check connect.", 0);
             
+            CommonDB iData = null;
+            bool result = false;
+            
             try
             {
-                using (var cdb = new CommonDB())
+                iData = new CommonDB();
+                iData.Connected = false;
+                iData.UserName = DBUser;
+                iData.Password = DBPass;
+                iData.Server = DBServer;
+                
+                #if INCLUDISDatabaseTyp == 1
+                    iData.InitialCatalog = DBInitialCatalog;
+                    iData.SqlProvider = DBProvider;
+                    WriteMessage("Using " + DBUser + "@" + DBServer + " (" + DBInitialCatalog + ")" + " - Provider:" + iData.SqlProvider, 0);
+                #else
+                    WriteMessage("Using " + DBUser + "@" + DBServer, 0);
+                #endif
+                
+                iData.Connected = true;
+                result = iData.Connected;
+                
+                try
                 {
-                    cdb.UserName = DBUser;
-                    cdb.Password = DBPass;
-                    cdb.Server = DBServer;
-                    cdb.InitialCatalog = DBInitialCatalog;
-                    cdb.SqlProvider = DBProvider;
-                    
-                    WriteMessage("Using " + DBUser + "@" + DBServer + " (" + DBInitialCatalog + ")" + " - Provider:" + DBProvider, 0);
-                    
-                    cdb.Connected = true;
-                    
-                    if (cdb.Connected)
-                    {
-                        WriteMessage("Connect Ok.", 0);
-                        return true;
-                    }
-                    else
-                    {
-                        WriteMessage("Connect failed.", 0);
-                        return false;
-                    }
+                    iData.Connected = false;
                 }
+                catch { }
+                
+                if (result)
+                    WriteMessage("Connect Ok.", 0);
+                else
+                    WriteMessage("Connect failed.", 0);
             }
             catch (Exception ex)
             {
                 WriteMessage("Connect failed: " + ex.Message, 0);
-                return false;
+                result = false;
             }
+            finally
+            {
+                try
+                {
+                    iData?.Dispose();
+                }
+                catch { }
+            }
+            
+            return result;
         }
 
         /// <summary>
-        /// Set database user from command line parameters
+        /// Set database user from command line parameters - 1:1 translation from Delphi
         /// </summary>
         private void SetDBUser(string[] args)
         {
@@ -214,21 +282,22 @@ namespace INCLService_Sharp
 
             if (args != null && args.Length > 0)
             {
-                foreach (var arg in args)
+                for (int i = 0; i < args.Length; i++)
                 {
-                    var upperArg = arg.ToUpper();
-                    if (upperArg.Contains(kDBUser.ToUpper()))
-                    {
-                        DBUser = arg.Substring(upperArg.IndexOf(kDBUser.ToUpper()) + kDBUser.Length);
-                    }
-                    if (upperArg.Contains(kDBPass.ToUpper()))
-                    {
-                        DBPass = arg.Substring(upperArg.IndexOf(kDBPass.ToUpper()) + kDBPass.Length);
-                    }
-                    if (upperArg.Contains(kDBServer.ToUpper()))
-                    {
-                        DBServer = arg.Substring(upperArg.IndexOf(kDBServer.ToUpper()) + kDBServer.Length);
-                    }
+                    string upperArg = args[i].ToUpper();
+                    int pos;
+                    
+                    pos = upperArg.IndexOf(kDBUser.ToUpper());
+                    if (pos > 0)
+                        DBUser = args[i].Substring(pos + kDBUser.Length, Math.Min(100, args[i].Length - pos - kDBUser.Length));
+
+                    pos = upperArg.IndexOf(kDBPass.ToUpper());
+                    if (pos > 0)
+                        DBPass = args[i].Substring(pos + kDBPass.Length, Math.Min(100, args[i].Length - pos - kDBPass.Length));
+
+                    pos = upperArg.IndexOf(kDBServer.ToUpper());
+                    if (pos > 0)
+                        DBServer = args[i].Substring(pos + kDBServer.Length, Math.Min(100, args[i].Length - pos - kDBServer.Length));
                 }
             }
 
@@ -247,18 +316,46 @@ namespace INCLService_Sharp
             DBUser = DBUser.ToUpper();
 
             // Load from INI file
-            var inifn = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), 
+            string inifn = Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), 
                 "INCL_" + DBUser + ".ini");
             
             if (File.Exists(inifn))
             {
-                // TODO: Implement INI file reading
-                // For now, use default values
+                // Read INI file - simplified version
+                var iniLines = File.ReadAllLines(inifn);
+                foreach (var line in iniLines)
+                {
+                    if (line.StartsWith("[Database]", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    
+                    var parts = line.Split('=');
+                    if (parts.Length == 2)
+                    {
+                        string key = parts[0].Trim();
+                        string value = parts[1].Trim();
+                        
+                        if (key.Equals("DB_Server", StringComparison.OrdinalIgnoreCase))
+                            DBServer = value;
+                        else if (key.Equals("InitialCatalog", StringComparison.OrdinalIgnoreCase))
+                            DBInitialCatalog = value;
+                        else if (key.Equals("Provider", StringComparison.OrdinalIgnoreCase))
+                            DBProvider = value;
+                        else if (key.Equals("Home", StringComparison.OrdinalIgnoreCase))
+                            INCLUDIS_HOME = value;
+                    }
+                }
+                
+                // Write back to INI file
+                try
+                {
+                    File.WriteAllText(inifn, string.Join(Environment.NewLine, iniLines));
+                }
+                catch { }
             }
         }
 
         /// <summary>
-        /// Write message to log file
+        /// Write message to log file - 1:1 translation from Delphi
         /// </summary>
         public static void WriteMessage(string message, int mode)
         {
@@ -268,11 +365,18 @@ namespace INCLService_Sharp
                     return;
 
                 INCLUDIS_HOME = ForceBackSlash(INCLUDIS_HOME);
-                var meldeDir = ForceBackSlash(INCLUDIS_HOME + TRACE_DIR);
+                string meldeDir = ForceBackSlash(INCLUDIS_HOME + TRACE_DIR);
 
                 if (!Directory.Exists(meldeDir))
                 {
-                    Directory.CreateDirectory(meldeDir);
+                    try
+                    {
+                        Directory.CreateDirectory(meldeDir);
+                    }
+                    catch
+                    {
+                        return;
+                    }
                 }
 
                 string meldeFile = mode switch
@@ -288,9 +392,9 @@ namespace INCLService_Sharp
                     _ => Path.Combine(meldeDir, "svc_" + DBUser.ToLower() + "_trace.log")
                 };
 
-                var s = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " : " + message;
+                string s = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " : " + message;
 
-                // Check file size
+                // Check file size and write
                 if (File.Exists(meldeFile))
                 {
                     var fileInfo = new FileInfo(meldeFile);
@@ -309,7 +413,7 @@ namespace INCLService_Sharp
                 }
 
                 // Check for specific error patterns
-                if (message.Contains("Gleitkommawert") || message.Contains("invalid month") || message.Contains("invalid number"))
+                if (s.Contains("Gleitkommawert") || s.Contains("invalid month") || s.Contains("invalid number"))
                 {
                     File.AppendAllText(meldeFile, "  DecimalSeparator: " + System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator + Environment.NewLine);
                     File.AppendAllText(meldeFile, "  ThousandSeparator: " + System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator + Environment.NewLine);
@@ -321,7 +425,7 @@ namespace INCLService_Sharp
         }
 
         /// <summary>
-        /// Ensure path ends with backslash
+        /// Ensure path ends with backslash - 1:1 translation from Delphi
         /// </summary>
         private static string ForceBackSlash(string s)
         {
