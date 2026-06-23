@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "INCLUDIS.Utils.CommonDB", "commondb\INCLUDIS.Utils.CommonDB.csproj", "{8EC9938D-C906-4504-8D2C-B85CCC2B4129}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "INCLService_Sharp", "INCLService_Sharp\INCLService_Sharp.csproj", "{19b54824-8453-421d-8c2f-56e57f3d0f2c}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|AnyCPU = Debug|AnyCPU
+		Release|AnyCPU = Release|AnyCPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8EC9938D-C906-4504-8D2C-B85CCC2B4129}.Debug|AnyCPU.ActiveCfg = Debug|AnyCPU
+		{8EC9938D-C906-4504-8D2C-B85CCC2B4129}.Debug|AnyCPU.Build.0 = Debug|AnyCPU
+		{8EC9938D-C906-4504-8D2C-B85CCC2B4129}.Release|AnyCPU.ActiveCfg = Release|AnyCPU
+		{8EC9938D-C906-4504-8D2C-B85CCC2B4129}.Release|AnyCPU.Build.0 = Release|AnyCPU
+		{19b54824-8453-421d-8c2f-56e57f3d0f2c}.Debug|AnyCPU.ActiveCfg = Debug|AnyCPU
+		{19b54824-8453-421d-8c2f-56e57f3d0f2c}.Debug|AnyCPU.Build.0 = Debug|AnyCPU
+		{19b54824-8453-421d-8c2f-56e57f3d0f2c}.Release|AnyCPU.ActiveCfg = Release|AnyCPU
+		{19b54824-8453-421d-8c2f-56e57f3d0f2c}.Release|AnyCPU.Build.0 = Release|AnyCPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A5D1143A-9E4A-4C3D-8F7A-123456789ABC}
+	EndGlobalSection
+EndGlobal
