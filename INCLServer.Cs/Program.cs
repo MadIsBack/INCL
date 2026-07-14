@@ -98,7 +98,7 @@ namespace INCLUDIS.INCLServer.Cs
                         .WriteTo.Console()
                         .WriteTo.File(
                             path: Path.Combine(logDir, $"svc_{dbUser.ToLower()}_trace.log"),
-                            rollingInterval: RollingInterval.Day,
+                            rollingInterval: Serilog.RollingInterval.Day,
                             fileSizeLimitBytes: (inclServerConfig?.LogSettings?.MaxFileSizeMB ?? 4) * 1024 * 1024,
                             retainedFileCountLimit: inclServerConfig?.LogSettings?.RetainedFileCount ?? 7,
                             outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} - {Message:lj}{NewLine}{Exception}");
@@ -108,38 +108,5 @@ namespace INCLUDIS.INCLServer.Cs
             // Host starten
             await host.RunAsync();
         }
-    }
-
-    // Konfigurationsklasse für INCLServer
-    public class INCLServerConfig
-    {
-        public string DBUser { get; set; } = "includis";
-        public string DBPass { get; set; } = "comtas";
-        public string DBServer { get; set; } = "db";
-        public string DBInitialCatalog { get; set; } = "includis";
-        public string DBProvider { get; set; } = "";
-        public string INCLUDIS_HOME { get; set; } = "D:\\comtas\\";
-        public LogSettings LogSettings { get; set; } = new();
-        public ThreadSettings ThreadSettings { get; set; } = new();
-    }
-
-    public class LogSettings
-    {
-        public int MaxFileSizeMB { get; set; } = 4;
-        public string LogDirectory { get; set; } = "LOG";
-        public int RetainedFileCount { get; set; } = 7;
-    }
-
-    public class ThreadSettings
-    {
-        public ServiceInterval SchichtService { get; set; } = new();
-        public ServiceInterval ZusatzService { get; set; } = new();
-        public ServiceInterval SignalLogService { get; set; } = new();
-        public ServiceInterval DBBackupService { get; set; } = new();
-    }
-
-    public class ServiceInterval
-    {
-        public int IntervalSeconds { get; set; } = 60;
     }
 }
