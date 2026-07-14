@@ -16,13 +16,18 @@ TCO_Query / TCO_Database	CommonDB (bereits vorhanden!)	Nutze die bestehende Comm
 CommonDb ist Äquivalent zu TCO_Database. Die Initialisierung sollte aus den Konstruktoren hervor gehen.
 CommonReader / CommonCommand sind die Äquivalente zu TCO_Query. Anstatt bei TCO_Query alles einzeln zu machen, kann ein Reader über ExecuteReader(SQLStatement) erzeugt und iteriert werden. Um ein SQL Statement auszuführen reicht ein ExecuteNonQuery(SQLStatement)
 Connection Pooling gibt es nicht mehr, Es gibt eine Instanz der CommonDB und dann werden die Reader einzeln erzeugt.
+Jeder Thread mit eigener Instanz der CommonDB
 
 Konfigurationen nur noch über json configs. Keine INI und Registry Sachen.
 
 TCO_SPC kann erst malweggelassen werden.
-TCO_TPM hat ein paar Funktionen für StatsistikBerechnungen.
+TCO_TPM hat ein paar Funktionen für StatsistikBerechnungen. Logik sollte in eine eigene Klasse implementiert werden.
 TOC_INCMeldung kann ebenfalls entfallen
 
-Log über Serilog
+Log über Serilog mit File-Sink + Rolling-File , aber mandanten-spezifisch
 
-Thread Kommunikation über Events
+TS7Main als MainService, der die anderen Services startet
+
+Kommunikation zwischen den BackgroundServices soll über Events erfolgen
+
+
