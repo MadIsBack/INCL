@@ -1,4 +1,5 @@
 using INCLUDIS.Utils.CommonDB;
+using INCLUDIS.INCLServer.Cs.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -50,6 +51,9 @@ namespace INCLUDIS.INCLServer.Cs.Services
                 {
                     // Signaländerungen protokollieren
                     await ProtokolliereSignalAenderungen(stoppingToken);
+                    
+                    // TPM-Signale auswerten
+                    await SignalHelper.EvaluateTPMSignals(_dbFactory());
 
                     // Wartezeit aus der Konfiguration
                     var interval = _config.ThreadSettings.SignalLogService.IntervalSeconds;
@@ -86,34 +90,48 @@ namespace INCLUDIS.INCLServer.Cs.Services
                 using var db = _dbFactory();
                 _logger.LogInformation("Lade Signale aus der Datenbank...");
                 
-                // Signale abrufen, die protokolliert werden sollen
-                using var reader = db.GetReader(@"
-                    SELECT sm.nr, sm.maschnr, s.signalnr, sm.istwert 
-                    FROM signale s 
-                    LEFT JOIN signal_maschine sm ON sm.signalnr = s.signalnr 
-                    WHERE s.logit = 1 OR s.signalart = 24
-                ");
-                
-                lock (_signalLock)
+                // Signale aus ArbeitHelper laden (falls bereits geladen)
+                if (ArbeitHelper.SignalList.Count > 0 && ArbeitHelper.MSignalList.Count > 0)
                 {
-                    _signalList.Clear();
-                    
-                    while (reader.Read())
+                    lock (_signalLock)
                     {
-                        var signal = new SignalClass
+                        _signalList.Clear();
+                        foreach (var signal in ArbeitHelper.MSignalList)
                         {
-                            Nr = reader.GetInt32("nr"),
-                            MaschNr = reader.GetInt32("maschnr"),
-                            SignalNr = reader.GetInt32("signalnr"),
-                            Istwert = reader.GetString("istwert")
-                        };
-                        
-                        _signalList.Add(signal);
-                        _logger.LogDebug("Signal geladen: Maschine {MaschNr}, Signal {SignalNr}, Wert: {Istwert}", signal.MaschNr, signal.SignalNr, signal.Istwert);
+                            var signalClass = new SignalClass
+                            {
+                                Nr = signal.Nr,
+                                MaschNr = signal.MaschNr,
+                                SignalNr = signal.SignalNr,
+                                Istwert = string.Empty // Wird später geladen
+                            };
+                            _signalList.Add(signalClass);
+                        }
                     }
+                    _logger.LogInformation("{SignalCount} Signale aus ArbeitHelper geladen.", _signalList.Count);
                 }
-                
-                _logger.LogInformation("{SignalCount} Signale geladen.", _signalList.Count);
+                else
+                {
+                    // Signale direkt aus der Datenbank laden
+                    SignalHelper.LoadSignals(db);
+                    
+                    lock (_signalLock)
+                    {
+                        _signalList.Clear();
+                        foreach (var signal in ArbeitHelper.MSignalList)
+                        {
+                            var signalClass = new SignalClass
+                            {
+                                Nr = signal.Nr,
+                                MaschNr = signal.MaschNr,
+                                SignalNr = signal.SignalNr,
+                                Istwert = string.Empty
+                            };
+                            _signalList.Add(signalClass);
+                        }
+                    }
+                    _logger.LogInformation("{SignalCount} Signale aus der Datenbank geladen.", _signalList.Count);
+                }
             }
             catch (Exception ex)
             {
@@ -150,7 +168,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     {
                         var maschNr = reader.GetInt32("maschnr");
                         var signalNr = reader.GetInt32("signalnr");
-                        var neuerWert = reader.GetString("istwert");
+                        var neuerWert = reader.IsDBNull("istwert") ? string.Empty : reader.GetString("istwert");
                         
                         // Signal in der Liste suchen
                         var signal = _signalList.Find(s => s.MaschNr == maschNr && s.SignalNr == signalNr);
@@ -164,6 +182,18 @@ namespace INCLUDIS.INCLServer.Cs.Services
                                 
                                 // Signaländerung in der Datenbank protokollieren
                                 ProtokolliereSignalAenderung(db, maschNr, signalNr, signal.Istwert, neuerWert);
+                                
+                                // Signallog schreiben
+                                SignalHelper.WriteSignallog(
+                                    db,
+                                    kommt: true,
+                                    first: false,
+                                    fehlerNr: 0,
+                                    schicht: "0",
+                                    status: "OK",
+                                    ursache: "Signaländerung",
+                                    wirkung: "Protokolliert",
+                                    maschNr: maschNr.ToString());
                                 
                                 // Wert in der Liste aktualisieren
                                 signal.Istwert = neuerWert;

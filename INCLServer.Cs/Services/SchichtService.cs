@@ -1,5 +1,6 @@
 using INCLUDIS.Utils.CommonDB;
 using INCLUDIS.INCLServer.Cs.Database;
+using INCLUDIS.INCLServer.Cs.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -43,7 +44,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
             _mainService.OnSchichtwechsel += MainService_OnSchichtwechsel;
         }
 
-        private void MainService_OnSchichtwechsel(object sender, SchichtEventArgs e)
+        private void MainService_OnSchichtwechsel(object sender, MainService.SchichtEventArgs e)
         {
             _logger.LogInformation("Schichtwechsel-Event empfangen: Schicht {SchichtNummer} (ID: {SchichtId})", e.SchichtNummer, e.SchichtId);
             _alteSchicht = e.SchichtNummer;
@@ -71,6 +72,9 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     {
                         // Regelmäßige Überprüfung
                         await PruefeSchichtwechsel(stoppingToken);
+                        
+                        // TPM-Daten aktualisieren
+                        await AktualisiereTPMDaten(stoppingToken);
                     }
 
                     // Wartezeit aus der Konfiguration
@@ -115,6 +119,9 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     _alteSchicht = reader.GetInt32("SchichtNummer");
                     _logger.LogInformation("Aktuelle Schicht: {AlteSchicht}", _alteSchicht);
                 }
+                
+                // Schichtkonstante setzen
+                TPMHelper.SetSchichtKonstante(db, _alteSchicht);
             }
             catch (Exception ex)
             {
@@ -136,6 +143,37 @@ namespace INCLUDIS.INCLServer.Cs.Services
             {
                 using var db = _dbFactory();
                 _logger.LogInformation("Berechne Schichtdaten für Schicht {AlteSchicht}...", _alteSchicht);
+                
+                // Maschinenleistung für die Schicht berechnen
+                await BerechneMaschinenleistung(db, stoppingToken);
+                
+                // Schichtwechsel berechnen
+                await BerechneSchichtwechsel(db, stoppingToken);
+                
+                // Stillstände berechnen
+                await BerechneStillstaende(db, stoppingToken);
+                
+                // A-Felder für die Schicht berechnen
+                TPMHelper.CalculateAFelderSchicht(db, _alteSchicht, DateTime.Today.AddDays(-1));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Fehler bei der Berechnung der Schichtdaten.");
+            }
+            finally
+            {
+                _berechnungAktiv = false;
+            }
+        }
+
+        /// <summary>
+        /// Berechnet die Maschinenleistung für die Schicht.
+        /// </summary>
+        private async Task BerechneMaschinenleistung(CommonDB db, CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogInformation("Berechne Maschinenleistung für Schicht {AlteSchicht}...", _alteSchicht);
                 
                 // Beispiel: Maschinenleistung für die Schicht berechnen
                 using var reader = db.GetReader(@"
@@ -159,21 +197,14 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     
                     // TPM-Statistikfunktionen aufrufen
                     _tpm.BerechneSchicht(_alteSchicht);
+                    
+                    // TPMHelper für detaillierte Berechnungen
+                    TPMHelper.CalculateTPM(db, maschNr, DateTime.Today);
                 }
-                
-                // Schichtwechsel berechnen
-                await BerechneSchichtwechsel(db, stoppingToken);
-                
-                // Stillstände berechnen
-                await BerechneStillstaende(db, stoppingToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Fehler bei der Berechnung der Schichtdaten.");
-            }
-            finally
-            {
-                _berechnungAktiv = false;
+                _logger.LogError(ex, "Fehler beim Berechnen der Maschinenleistung.");
             }
         }
 
@@ -231,11 +262,39 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     
                     // TPM-Statistikfunktionen aufrufen
                     _tpm.BerechneStillstandszeiten(maschNr, startZeit, endeZeit);
+                    
+                    // TPMHelper für Stillstandsprüfung
+                    TPMHelper.CheckTPMStillstand(db, maschNr);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Fehler beim Berechnen der Stillstände.");
+            }
+        }
+
+        /// <summary>
+        /// Aktualisiert die TPM-Daten für alle Maschinen.
+        /// </summary>
+        private async Task AktualisiereTPMDaten(CancellationToken stoppingToken)
+        {
+            try
+            {
+                using var db = _dbFactory();
+                _logger.LogInformation("Aktualisiere TPM-Daten...");
+                
+                // Für jede Maschine die TPM-Werte aktualisieren
+                foreach (var maschine in ArbeitHelper.MaschineList)
+                {
+                    if (stoppingToken.IsCancellationRequested)
+                        break;
+                    
+                    TPMHelper.CalculateTPM(db, maschine.MaschNr, DateTime.Today);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Fehler beim Aktualisieren der TPM-Daten.");
             }
         }
 

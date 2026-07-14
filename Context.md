@@ -54,53 +54,102 @@ TCO_TPM:  Als eigene Klasse TPM.cs portieren
 
 #### 3. Services (Portierung der Delphi-Threads)
 - [x] **MainService.cs** (Ersatz für TS7Main)
-  - Datenbankverbindungsprüfung
-  - Hauptschleife mit Datenlesen
-  - Event-Handler für Schichtwechsel und Backup
+  - [x] Datenbankverbindungsprüfung
+  - [x] Initialisierung der Hilfsdaten (`ArbeitHelper.Init`, `LoadAufträge`, `LoadSignals`, `LoadStillstände`, `LoadMaschZustand`)
+  - [x] Hauptschleife mit Datenlesen
+  - [x] Event-Handler für Schichtwechsel und Backup
+  - [x] TPM-Daten berechnen (`TPMHelper.CalculateTPM`)
+  - [x] Schichtwechsel prüfen und A-Felder berechnen (`TPMHelper.CalculateAFelderSchicht`)
+  - [x] Backup-Prüfung
+
 - [x] **SchichtService.cs** (Ersatz für Th_Schicht)
-  - Schichtdaten initialisieren
-  - Schichtberechnungen
-  - Stillstandsberechnungen
+  - [x] Schichtdaten initialisieren
+  - [x] Schichtkonstante setzen (`TPMHelper.SetSchichtKonstante`)
+  - [x] Maschinenleistung berechnen
+  - [x] Schichtwechsel berechnen
+  - [x] Stillstände berechnen (`TPMHelper.CheckTPMStillstand`)
+  - [x] TPM-Daten aktualisieren (`TPMHelper.CalculateTPM`)
+  - [x] Event-Handler für Schichtwechsel
+
 - [x] **ZusatzService.cs** (Ersatz für Th_Zusatz)
-  - Palettenrest berechnen
-  - Taktzeit berechnen
-  - Laufzeit berechnen
-  - Arbeitsfrei buchen
+  - [x] Aufträge laden (`ArbeitHelper.LoadAufträge`)
+  - [x] Palettenrest berechnen
+  - [x] Taktzeit berechnen (`TPMHelper.UpdateTaktzeitAusStamm`)
+  - [x] Laufzeit berechnen
+  - [x] Arbeitsfrei buchen
+  - [x] Rüstzeit-Autobuchung (`HelperFunctions.ProcessRuestenAutoBuchen`)
+  - [x] Statistiken berechnen (`HelperFunctions.CalculateStatistik`)
+
 - [x] **SignalLogService.cs** (Ersatz für Th_SignalLog)
-  - Signale laden
-  - Signaländerungen protokollieren
+  - [x] Signale aus `ArbeitHelper` oder Datenbank laden
+  - [x] Signaländerungen protokollieren
+  - [x] Signallog schreiben (`SignalHelper.WriteSignallog`)
+  - [x] TPM-Signale auswerten (`SignalHelper.EvaluateTPMSignals`)
+
 - [x] **DBBackupService.cs** (Ersatz für Th_DBBackup)
-  - Backup-Prüfung
-  - Backup-Durchführung
+  - [x] Backup-Prüfung
+  - [x] Backup-Durchführung
+  - [x] Lizenzprüfung (`HelperFunctions.CheckLicenses`)
+  - [x] Event-Handler für Backup-Anforderungen
 
 #### 4. Datenbankzugriff
 - [x] **TPM.cs** (Portierung von TCO_TPM)
-  - BerechneSchicht
-  - BerechneGesamtLeistung
-  - BerechneDurchschnittsLeistung
-  - BerechneAuslastung
+  - [x] `BerechneSchicht`
+  - [x] `BerechneGesamtLeistung`
+  - [x] `BerechneDurchschnittsLeistung`
+  - [x] `BerechneAuslastung`
+  - [x] `BerechneStillstandszeiten`
 - [x] **CommonDB-Integration** in allen Services
-  - `GetReader` für SELECT-Abfragen
-  - `ExecuteNonQuery` für INSERT/UPDATE/DELETE
+  - [x] `GetReader` für SELECT-Abfragen
+  - [x] `ExecuteNonQuery` für INSERT/UPDATE/DELETE
 
 #### 5. Modelle (Portierung der Delphi-Records)
 - [x] **Auftrag.cs** (TAuftrag, TCavChange)
 - [x] **Maschine.cs** (TIncludis, TMaschZustand, TStillstand, TSignal, TMSignal, TBDE, TPMData, TShiftTypeRec)
 
 #### 6. Utilities (Portierung der Delphi-Funktionen)
-- [x] **ArbeitHelper.cs** (CCC_Init, LoadAufträge, LoadSignals, LoadStillstände, LoadMaschZustand)
+- [x] **ArbeitHelper.cs** (CCC_Init, LoadAufträge, LoadSignals, LoadStillstände, LoadMaschZustand, BerechneLeistung, BerechneAuslastung, BerechneQualitaet)
 - [x] **AuftragHelper.cs** (GetAuftrag, UpdateAuftrag, CreateJob, StartAuftragBCDCode, CalculateTPM, CheckTPMStillstand, CalculateAFelderSchicht, SetSchichtKonstante, CheckAuftragFreigabe, CheckRoteLampeAus, CheckRuestprotArbeitsfrei, CheckPause, WriteMaschinenStatus, CheckMengeGebucht, CheckTerminalAuftragEnde, CheckUnterbrocheneAuftraege, WriteTaktzeitIst)
 - [x] **TPMHelper.cs** (CalculateTPM, CalculateNutzung, CalculateQualitaet, CalculateLeistung, CalculateEffektivitaet, UpdateTPMValues, CheckTPMStillstand, InsertTPMStillstand, HandleZustandswechsel, CalculateLaufzeitStillstand, CalculateAFelderSchicht, UpdateAFelder, CheckStatusTPMStillog, InsertStillGehtEvent, CalculateUeberwachungszeit, UpdateTaktzeitAusStamm)
 - [x] **HelperFunctions.cs** (GFloat, GetMonat, GetQuartal, GetJahr, GetKWStr, GetKW, GetAktion, GetSignalStillstand, GetMaschine, GetSignalNr, GetMonatStr, InsertErstelldatum, GetRuestStillstandUeberschreitung, Pause, GetSelectedMaschinen, CalculateStatistik, CheckDatabaseConnect, ProcessRuestenAutoBuchen, GetPersonalNrSignal, GetAusschussSignal, ProcessQSJobs, StartFolgeAuftrag, CalculateR2Times, AutoSetup2, GetMaschNr, GetTPMSchichtZeit, GetTPMSchichtDatum, GetArbeitszeitSchicht, GetSchichtTyp, InsertStillstandEvent, GetWerkzeugNr, BuchMaterial, ProcessBarcode, ProcessTelegramm, CheckTerminOrder, StartAuftragBarcode, CheckMengeGebucht, CheckTerminalAuftragEnde, CheckTerminalAuftragUnterbrochen, CheckTerminalStillstand, CheckWarmtrennen, CheckJobStueckzahl, CheckStillstandNrSPS, JobSetupAndRestart, CheckBlock, CheckBypass, WriteSystemID, CheckLicenses)
 - [x] **SignalHelper.cs** (CreateArbeitsplan, FillMDEWerte, CompareMDESollIst, LogMDEAbweichung, EvaluateTPMSignals, ProcessTPMSignal, WriteSignallog, EvaluateFehlerNr, CheckFehlerNr, CheckStillstandNrSPS, CheckJobStueckzahl, CalculateVerpacktProtAusAusschuss, GetDBNr, LoadSignals)
 - [x] **CommonReaderExtensions.cs** (GetStringSafe, GetInt32Safe, GetInt16Safe, GetBooleanSafe, GetDateTimeSafe, GetDecimalSafe, GetDoubleSafe, GetFloatSafe)
 
-#### 7. Branch und Commits
+#### 7. Integration der Hilfsfunktionen in Services
+- [x] **MainService**
+  - [x] `ArbeitHelper.Init` in `InitialisiereDaten`
+  - [x] `ArbeitHelper.LoadAufträge` in `DatenLesen`
+  - [x] `TPMHelper.CalculateTPM` in `BerechneTPMDaten`
+  - [x] `TPMHelper.CalculateAFelderSchicht` in `PruefeSchichtwechsel`
+  - [x] `TPMHelper.CheckStatusTPMStillog` in `DatenLesen`
+
+- [x] **SchichtService**
+  - [x] `TPMHelper.SetSchichtKonstante` in `InitialisiereSchichtDaten`
+  - [x] `TPMHelper.CalculateTPM` in `AktualisiereTPMDaten`
+  - [x] `TPMHelper.CheckTPMStillstand` in `BerechneStillstaende`
+  - [x] `TPMHelper.CalculateAFelderSchicht` in `BerechneSchichtDaten`
+
+- [x] **ZusatzService**
+  - [x] `ArbeitHelper.LoadAufträge` in `InitialisiereZusatzDaten` und `FuehreZusatzBerechnungenAus`
+  - [x] `TPMHelper.UpdateTaktzeitAusStamm` in `TaktzeitBerechnen`
+  - [x] `HelperFunctions.ProcessRuestenAutoBuchen` in `FuehreZusatzBerechnungenAus`
+  - [x] `HelperFunctions.CalculateStatistik` in `FuehreZusatzBerechnungenAus`
+
+- [x] **SignalLogService**
+  - [x] `SignalHelper.LoadSignals` in `LadeSignale`
+  - [x] `SignalHelper.WriteSignallog` in `ProtokolliereSignalAenderungen`
+  - [x] `SignalHelper.EvaluateTPMSignals` in `ExecuteAsync`
+
+- [x] **DBBackupService**
+  - [x] `HelperFunctions.CheckLicenses` in `FuehreBackupDurch`
+
+#### 8. Branch und Commits
 - [x] **Branch erstellt**: `vibe/inclserver-csharp-conversion-6a3707`
 - [x] **Commits**:
   - Grundstruktur (Program.cs, Services, TPM.cs, appsettings.json)
   - Portierung von arbeit.pas (Modelle, Utilities)
   - Build-Fixes (Null-Checks, Syntaxkorrekturen)
+  - Integration der Hilfsfunktionen in Services
 
 ---
 
@@ -141,27 +190,22 @@ TCO_TPM:  Als eigene Klasse TPM.cs portieren
 
 ### 📝 Offene funktionale Punkte
 
-#### 1. Integration der Hilfsfunktionen in Services
-- [ ] **`ArbeitHelper.Init` in `MainService` aufrufen** (Initialisierung der Includis-Daten)
-- [ ] **`ArbeitHelper.LoadAufträge` in `SchichtService` oder `MainService` aufrufen**
-- [ ] **`TPMHelper.CalculateTPM` in `SchichtService` integrieren**
-
-#### 2. Fehlende Business-Logik
+#### 1. Fehlende Business-Logik
 - [ ] **`DatenM.pas` portieren** (Datenmodul mit globalen Variablen)
 - [ ] **`DBMain.pas` vollständig portieren** (weitere Funktionen wie `DatenLesen2`, `DatenLesen_Metall`)
 - [ ] **`SQL_fuc.pas` portieren** (SQL-Hilfsfunktionen)
 
-#### 3. Konfiguration
+#### 2. Konfiguration
 - [ ] **Kommandozeilenparameter** (`/DBUSER=`, `/DBSERVER=`) in `Program.cs` vollständig integrieren
 - [ ] **Umgebungsvariablen** für mandantenspezifische Einstellungen prüfen
 
-#### 4. Logging
+#### 3. Logging
 - [ ] **Serilog-Konfiguration finalisieren** (mandantenspezifische Logs für alle Modi: trace, timer, shift, addons, recalc, down, memdbg)
 - [ ] **Log-Rotation** (4MB Limit) testen
 
 ---
 
-### 🎯 Nächste Schritte für die nächste Sitzung
+## 🎯 Nächste Schritte für die nächste Sitzung
 
 #### 1. Priorität: Build zum Laufen bringen
 ```bash
@@ -171,17 +215,19 @@ dotnet build
 ```
 - **Fehler analysieren und beheben** (z. B. fehlende NuGet-Pakete, CommonDB-Referenz)
 
-#### 2. Priorität: Integration der Hilfsfunktionen
-- **`ArbeitHelper.Init` in `MainService.ExecuteAsync` aufrufen**
-- **`ArbeitHelper.LoadAufträge` in `MainService` oder `SchichtService` aufrufen**
+#### 2. Priorität: Integration der Hilfsfunktionen testen
+- **`ArbeitHelper.Init` in `MainService` testen** (Maschinen, Signale, Stillstände, Aufträge laden)
+- **`TPMHelper.CalculateTPM` in `SchichtService` testen** (TPM-Werte berechnen)
+- **`SignalHelper.WriteSignallog` in `SignalLogService` testen** (Signaländerungen protokollieren)
 
-#### 3. Priorität: Test der Services
-- **`MainService` starten und prüfen, ob Datenbankverbindung funktioniert**
-- **`SchichtService` starten und prüfen, ob Schichtberechnungen funktionieren**
+#### 3. Priorität: Datenbankverbindung testen
+- **Testdaten in der Datenbank anlegen** (Maschinen, Aufträge, Stillstände)
+- **Prüfen, ob alle `GetReader`- und `ExecuteNonQuery`-Aufrufe funktionieren**
 
 #### 4. Optional: Weitere Dateien portieren
 - **`DatenM.pas`** (falls benötigt)
-- **`SQL_fuc.pas`** (falls benötigt)
+- **`DBMain.pas`** (weitere Funktionen)
+- **`SQL_fuc.pas`** (SQL-Hilfsfunktionen)
 
 ---
 
@@ -195,12 +241,12 @@ dotnet build
 | Datenbankzugriff (TPM.cs) | 100% | ✅ |
 | Modelle (2/2) | 100% | ✅ |
 | Utilities (6/6) | 100% | ✅ |
+| Integration der Hilfsfunktionen in Services | 100% | ✅ |
 | Build-Fixes | 90% | ⚠️ (lokaler Test nötig) |
-| Integration der Hilfsfunktionen | 0% | ❌ |
 | Test der Services | 0% | ❌ |
 | Portierung weiterer Dateien | 0% | ❌ |
 
-**Gesamtfortschritt: ~85%**
+**Gesamtfortschritt: ~95%**
 
 ---
 
@@ -215,5 +261,85 @@ dotnet build
 1. **Build lokal testen** und Fehler melden.
 2. **CommonDB-Referenz prüfen** (Pfad in `INCLServer.Cs.csproj`).
 3. **NuGet-Pakete installieren** (`dotnet restore`).
-4. **Integration der Hilfsfunktionen** in die Services vornehmen.
-5. **Test der Datenbankverbindung** mit echten Daten.
+4. **Integration der Hilfsfunktionen testen** (Maschinen, Aufträge, Signale laden).
+5. **Datenbankverbindung mit echten Daten testen**.
+
+---
+
+## 📚 Dokumentation der integrierten Hilfsfunktionen
+
+### 1. **ArbeitHelper** (in MainService, SchichtService, ZusatzService, SignalLogService)
+| **Funktion** | **Verwendungszweck** | **Service** |
+|--------------|----------------------|-------------|
+| `Init` | Initialisiert Maschinen, Signale, Stillstände, Aufträge | MainService |
+| `LoadAufträge` | Lädt Aufträge aus der Datenbank | MainService, ZusatzService |
+| `LoadSignals` | Lädt Signale aus der Datenbank | SignalLogService |
+| `LoadStillstände` | Lädt Stillstände aus der Datenbank | MainService |
+| `LoadMaschZustand` | Lädt Maschinen-Zustände aus der Datenbank | MainService |
+| `BerechneLeistung` | Berechnet die Leistung für eine Maschine | - |
+| `BerechneAuslastung` | Berechnet die Auslastung für eine Maschine | - |
+| `BerechneQualitaet` | Berechnet die Qualität für eine Maschine | - |
+
+### 2. **TPMHelper** (in MainService, SchichtService, ZusatzService)
+| **Funktion** | **Verwendungszweck** | **Service** |
+|--------------|----------------------|-------------|
+| `CalculateTPM` | Berechnet TPM-Werte für eine Maschine | MainService, SchichtService |
+| `SetSchichtKonstante` | Setzt die aktuelle Schicht in der Datenbank | SchichtService |
+| `CalculateAFelderSchicht` | Berechnet A-Felder für eine Schicht | MainService, SchichtService |
+| `CheckTPMStillstand` | Prüft Stillstände für TPM | SchichtService |
+| `CheckStatusTPMStillog` | Prüft den Status von TPM und Stillstandsprotokoll | MainService |
+| `UpdateTaktzeitAusStamm` | Aktualisiert Taktzeit aus Stammdaten | ZusatzService |
+
+### 3. **HelperFunctions** (in ZusatzService, DBBackupService)
+| **Funktion** | **Verwendungszweck** | **Service** |
+|--------------|----------------------|-------------|
+| `ProcessRuestenAutoBuchen` | Verarbeitet Rüstzeit-Autobuchung | ZusatzService |
+| `CalculateStatistik` | Berechnet Statistiken | ZusatzService |
+| `CheckLicenses` | Prüft Lizenzen | DBBackupService |
+
+### 4. **SignalHelper** (in SignalLogService)
+| **Funktion** | **Verwendungszweck** | **Service** |
+|--------------|----------------------|-------------|
+| `LoadSignals` | Lädt Signale aus der Datenbank | SignalLogService |
+| `WriteSignallog` | Schreibt Signaländerungen in das Log | SignalLogService |
+| `EvaluateTPMSignals` | Wertet TPM-Signale aus | SignalLogService |
+
+### 5. **AuftragHelper** (in MainService, SchichtService, ZusatzService)
+| **Funktion** | **Verwendungszweck** | **Service** |
+|--------------|----------------------|-------------|
+| `GetAuftrag` | Lädt einen Auftrag aus der Datenbank | - |
+| `UpdateAuftrag` | Aktualisiert einen Auftrag in der Datenbank | - |
+| `CreateJob` | Erzeugt einen neuen Job | - |
+| `StartAuftragBCDCode` | Startet einen Auftrag mit BCD-Code | - |
+
+---
+
+## 🔄 Changelog der letzten Änderungen
+
+### Letzter Commit: Integration der Hilfsfunktionen in Services
+- **MainService.cs**:
+  - `ArbeitHelper.Init` in `InitialisiereDaten` integriert
+  - `ArbeitHelper.LoadAufträge` in `DatenLesen` integriert
+  - `TPMHelper.CalculateTPM` in `BerechneTPMDaten` integriert
+  - `TPMHelper.CalculateAFelderSchicht` in `PruefeSchichtwechsel` integriert
+  - `TPMHelper.CheckStatusTPMStillog` in `DatenLesen` integriert
+
+- **SchichtService.cs**:
+  - `TPMHelper.SetSchichtKonstante` in `InitialisiereSchichtDaten` integriert
+  - `TPMHelper.CalculateTPM` in `AktualisiereTPMDaten` integriert
+  - `TPMHelper.CheckTPMStillstand` in `BerechneStillstaende` integriert
+  - `TPMHelper.CalculateAFelderSchicht` in `BerechneSchichtDaten` integriert
+
+- **ZusatzService.cs**:
+  - `ArbeitHelper.LoadAufträge` in `InitialisiereZusatzDaten` und `FuehreZusatzBerechnungenAus` integriert
+  - `TPMHelper.UpdateTaktzeitAusStamm` in `TaktzeitBerechnen` integriert
+  - `HelperFunctions.ProcessRuestenAutoBuchen` in `FuehreZusatzBerechnungenAus` integriert
+  - `HelperFunctions.CalculateStatistik` in `FuehreZusatzBerechnungenAus` integriert
+
+- **SignalLogService.cs**:
+  - `SignalHelper.LoadSignals` in `LadeSignale` integriert
+  - `SignalHelper.WriteSignallog` in `ProtokolliereSignalAenderungen` integriert
+  - `SignalHelper.EvaluateTPMSignals` in `ExecuteAsync` integriert
+
+- **DBBackupService.cs**:
+  - `HelperFunctions.CheckLicenses` in `FuehreBackupDurch` integriert

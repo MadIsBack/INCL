@@ -1,5 +1,6 @@
 using INCLUDIS.Utils.CommonDB;
 using INCLUDIS.INCLServer.Cs.Database;
+using INCLUDIS.INCLServer.Cs.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -26,6 +27,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
         // Status-Flags
         private bool _datenLesenAktiv = false;
         private bool _s7MainOK = true;
+        private bool _initialisiert = false;
         private int _errorCount = 0;
 
         public MainService(
@@ -42,7 +44,10 @@ namespace INCLUDIS.INCLServer.Cs.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("MainService gestartet. Initialisiere Datenbankverbindung...");
+            _logger.LogInformation("MainService gestartet. Initialisiere Daten...");
+
+            // Initialisierung der Hilfsdaten
+            await InitialisiereDaten(stoppingToken);
 
             // Warten, bis die Datenbankverbindung steht
             while (!await CheckDBVerbindung(stoppingToken) && !stoppingToken.IsCancellationRequested)
@@ -97,6 +102,48 @@ namespace INCLUDIS.INCLServer.Cs.Services
         }
 
         /// <summary>
+        /// Initialisiert die Daten (Maschinen, Signale, Stillstände, Aufträge).
+        /// </summary>
+        private async Task InitialisiereDaten(CancellationToken stoppingToken)
+        {
+            if (_initialisiert)
+                return;
+
+            try
+            {
+                using var db = _dbFactory();
+                _logger.LogInformation("Initialisiere Maschinen- und Includis-Daten...");
+                
+                // Maschinen und Includis-Daten laden
+                ArbeitHelper.Init(db);
+                
+                // Signale laden
+                ArbeitHelper.LoadSignals(db);
+                
+                // Stillstände laden
+                ArbeitHelper.LoadStillstände(db);
+                
+                // Maschinen-Zustände laden
+                ArbeitHelper.LoadMaschZustand(db);
+                
+                // Aufträge laden
+                ArbeitHelper.LoadAufträge(db);
+                
+                _logger.LogInformation("Daten initialisiert: {MaschinenCount} Maschinen, {SignaleCount} Signale, {StillständeCount} Stillstände",
+                    ArbeitHelper.MaschineList.Count,
+                    ArbeitHelper.SignalList.Count,
+                    ArbeitHelper.StillstandList.Count);
+                
+                _initialisiert = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Fehler bei der Initialisierung der Daten.");
+                _initialisiert = false;
+            }
+        }
+
+        /// <summary>
         /// Prüft die Datenbankverbindung.
         /// </summary>
         private async Task<bool> CheckDBVerbindung(CancellationToken stoppingToken)
@@ -132,22 +179,20 @@ namespace INCLUDIS.INCLServer.Cs.Services
                 using var db = _dbFactory();
                 _logger.LogInformation("Lese Daten aus der Datenbank...");
                 
-                // Beispiel: Maschinenleistung abrufen
-                using var reader = db.GetReader("SELECT MaschNr, Stueck FROM Maschinenleistung WHERE Berechnet = 0");
+                // Aufträge aktualisieren
+                ArbeitHelper.LoadAufträge(db);
                 
-                while (reader.Read())
-                {
-                    var maschNr = reader.GetInt32("MaschNr");
-                    var stueck = reader.GetInt32("Stueck");
-                    
-                    _logger.LogDebug("Maschine {MaschNr}: {Stueck} Stück", maschNr, stueck);
-                }
+                // TPM-Daten berechnen
+                await BerechneTPMDaten(db, stoppingToken);
                 
                 // Schichtwechsel prüfen
                 await PruefeSchichtwechsel(db, stoppingToken);
                 
                 // Backup prüfen
                 await PruefeBackup(db, stoppingToken);
+                
+                // Stillstände prüfen
+                await TPMHelper.CheckStatusTPMStillog(db);
             }
             catch (Exception ex)
             {
@@ -157,6 +202,30 @@ namespace INCLUDIS.INCLServer.Cs.Services
             finally
             {
                 _datenLesenAktiv = false;
+            }
+        }
+
+        /// <summary>
+        /// Berechnet TPM-Daten für alle Maschinen.
+        /// </summary>
+        private async Task BerechneTPMDaten(CommonDB db, CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogInformation("Berechne TPM-Daten...");
+                
+                // Für jede Maschine die TPM-Werte berechnen
+                foreach (var maschine in ArbeitHelper.MaschineList)
+                {
+                    if (stoppingToken.IsCancellationRequested)
+                        break;
+                    
+                    TPMHelper.CalculateTPM(db, maschine.MaschNr, DateTime.Today);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Fehler beim Berechnen der TPM-Daten.");
             }
         }
 
@@ -182,6 +251,9 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     
                     // Schicht berechnen
                     _tpm.BerechneSchicht(schichtId);
+                    
+                    // A-Felder für die Schicht berechnen
+                    TPMHelper.CalculateAFelderSchicht(db, schichtNummer, DateTime.Today.AddDays(-1));
                 }
             }
             catch (Exception ex)
@@ -237,6 +309,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
             
             _s7MainOK = true;
             _errorCount = 0;
+            _initialisiert = false; // Daten neu laden
         }
 
         /// <summary>

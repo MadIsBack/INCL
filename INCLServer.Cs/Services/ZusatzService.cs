@@ -1,5 +1,6 @@
 using INCLUDIS.Utils.CommonDB;
 using INCLUDIS.INCLServer.Cs.Database;
+using INCLUDIS.INCLServer.Cs.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -86,6 +87,9 @@ namespace INCLUDIS.INCLServer.Cs.Services
                 using var db = _dbFactory();
                 _logger.LogInformation("Initialisiere Zusatzdaten...");
                 
+                // Aufträge laden
+                ArbeitHelper.LoadAufträge(db);
+                
                 // Letztes Berechnungsdatum abrufen
                 using var reader = db.GetReader("SELECT TOP 1 BerechnungsDatum FROM ZusatzBerechnungen ORDER BY Id DESC");
                 if (reader.Read())
@@ -115,17 +119,26 @@ namespace INCLUDIS.INCLServer.Cs.Services
                 using var db = _dbFactory();
                 _logger.LogInformation("Führe zusätzliche Berechnungen aus...");
                 
-                // Beispiel: Palettenrest berechnen
+                // Aufträge aktualisieren
+                ArbeitHelper.LoadAufträge(db);
+                
+                // Palettenrest berechnen
                 await PaletteRestBerechnen(db, stoppingToken);
                 
-                // Beispiel: Taktzeit berechnen
+                // Taktzeit berechnen
                 await TaktzeitBerechnen(db, stoppingToken);
                 
-                // Beispiel: Laufzeit berechnen
+                // Laufzeit berechnen
                 await LaufzeitBerechnen(db, stoppingToken);
                 
-                // Beispiel: Arbeitsfrei buchen
+                // Arbeitsfrei buchen
                 await ArbeitsFreiBuchen(db, stoppingToken);
+                
+                // Rüstzeit-Autobuchung prüfen
+                HelperFunctions.ProcessRuestenAutoBuchen(db);
+                
+                // Statistiken berechnen
+                HelperFunctions.CalculateStatistik(db);
                 
                 // Aktuelles Datum speichern
                 _lastDate = DateTime.Now;
@@ -174,6 +187,14 @@ namespace INCLUDIS.INCLServer.Cs.Services
                         WHERE AuftragNr = @AuftragNr";
                     
                     db.ExecuteNonQuery(updateSql, new { AuftragNr = auftragNr, RestStueck = restStueck });
+                    
+                    // Auftrag in der Liste aktualisieren
+                    var auftrag = ArbeitHelper.IncludisList.Find(i => i.Auftrag.AuftragNr == auftragNr)?.Auftrag;
+                    if (auftrag != null)
+                    {
+                        auftrag.Sollwert = sollStueck;
+                        auftrag.Istwert = istStueck;
+                    }
                 }
             }
             catch (Exception ex)
@@ -190,6 +211,9 @@ namespace INCLUDIS.INCLServer.Cs.Services
             try
             {
                 _logger.LogInformation("Berechne Taktzeit...");
+                
+                // Taktzeit aus Stammdaten aktualisieren
+                TPMHelper.UpdateTaktzeitAusStamm(db);
                 
                 // Beispiel: Taktzeit für Maschinen berechnen
                 using var reader = db.GetReader(@"

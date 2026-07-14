@@ -1,4 +1,5 @@
 using INCLUDIS.Utils.CommonDB;
+using INCLUDIS.INCLServer.Cs.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -39,7 +40,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
             _mainService.OnBackupRequired += MainService_OnBackupRequired;
         }
 
-        private void MainService_OnBackupRequired(object sender, BackupEventArgs e)
+        private void MainService_OnBackupRequired(object sender, MainService.BackupEventArgs e)
         {
             _logger.LogInformation("Backup-Event empfangen: Backup um {BackupZeitpunkt}", e.BackupZeitpunkt);
             _ = FuehreBackupDurch(); // Fire-and-Forget
@@ -59,7 +60,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     {
                         await FuehreBackupDurch();
                     }
-
+                    
                     // Wartezeit aus der Konfiguration
                     var interval = _config.ThreadSettings.DBBackupService.IntervalSeconds;
                     await Task.Delay(interval * 1000, stoppingToken);
@@ -137,9 +138,16 @@ namespace INCLUDIS.INCLServer.Cs.Services
                 // Backup-Dateiname generieren
                 var backupDatei = Path.Combine(backupDir, $"Backup_{_config.DBInitialCatalog}_{DateTime.Now:yyyyMMdd_HHmmss}.bak");
                 
+                // Prüfen, ob Lizenzen gültig sind
+                if (!HelperFunctions.CheckLicenses(_dbFactory()))
+                {
+                    _logger.LogWarning("Backup abgebrochen: Lizenzen nicht gültig.");
+                    return;
+                }
+                
                 // Hier würde normalerweise der Backup-Befehl ausgeführt werden
-                // Beispiel für SQL Server:
-                // var backupBefehl = $"sqlcmd -S {_config.DBServer} -U {_config.DBUser} -P {_config.DBPass} -Q \"BACKUP DATABASE [{_config.DBInitialCatalog}] TO DISK = '{backupDatei}'\"";
+                // Beispiel für SQL Server mit sqlcmd:
+                // await FuehreExternesBackupDurch(backupDatei);
                 
                 // Für diese Implementierung simulieren wir das Backup
                 _logger.LogInformation("Backup wird durchgeführt: {BackupDatei}", backupDatei);
