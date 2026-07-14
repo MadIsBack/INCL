@@ -30,4 +30,7 @@ TS7Main als MainService, der die anderen Services startet
 
 Kommunikation zwischen den BackgroundServices soll über Events erfolgen
 
+Logging:  Serilog (empfohlen für File-Rotation)    
+
+TCO_TPM:  Als eigene Klasse TPM.cs portieren
 
