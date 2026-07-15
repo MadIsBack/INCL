@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Extensions.Hosting;
 using System.IO;
 
 namespace INCLUDIS.INCLServer.Cs
