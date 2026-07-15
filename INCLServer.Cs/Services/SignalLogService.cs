@@ -168,7 +168,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     {
                         var maschNr = reader.GetInt32("maschnr");
                         var signalNr = reader.GetInt32("signalnr");
-                        var neuerWert = reader.IsDBNull("istwert") ? string.Empty : reader.GetString("istwert");
+                        var neuerWert = reader.IsNull("istwert") ? string.Empty : reader.GetString("istwert");
                         
                         // Signal in der Liste suchen
                         var signal = _signalList.Find(s => s.MaschNr == maschNr && s.SignalNr == signalNr);

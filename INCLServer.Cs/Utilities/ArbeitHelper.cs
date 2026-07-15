@@ -44,29 +44,29 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
             {
                 var maschine = new Maschine
                 {
-                    MaschNr = reader.IsDBNull("Maschnr") ? 0 : reader.GetInt32("Maschnr"),
-                    Lizenz = reader.IsDBNull("Lizenz") ? string.Empty : reader.GetString("Lizenz")
+                    MaschNr = reader.IsNull("Maschnr") ? 0 : reader.GetInt32("Maschnr"),
+                    Lizenz = reader.IsNull("Lizenz") ? string.Empty : reader.GetString("Lizenz")
                 };
                 MaschineList.Add(maschine);
 
                 var includis = new Includis
                 {
-                    Lizenz = reader.IsDBNull("Lizenz") ? string.Empty : reader.GetString("Lizenz"),
-                    Maschine = reader.IsDBNull("Kennung") ? string.Empty : reader.GetString("Kennung"),
-                    KURZKENNUNG = reader.IsDBNull("KURZKENNUNG") ? string.Empty : reader.GetString("KURZKENNUNG"),
-                    MaschNr = reader.IsDBNull("Datenblock") ? string.Empty : reader.GetString("Datenblock"),
-                    MaschNrEcht = reader.IsDBNull("Maschnr") ? string.Empty : reader.GetString("Maschnr"),
-                    SORT_MASCHPANEL = reader.IsDBNull("SORT_MASCHPANEL") ? 0 : reader.GetInt32("SORT_MASCHPANEL"),
-                    MaschAktiv = reader.IsDBNull("MaschAktiv") ? false : reader.GetInt32("MaschAktiv") != 0,
-                    Datenblock = reader.IsDBNull("Datenblock") ? (short)0 : reader.GetInt16("Datenblock"),
-                    AutoRuesten = reader.IsDBNull("Autoruesten") ? false : reader.GetInt32("Autoruesten") == 1,
-                    MaschWarmtrennen = reader.IsDBNull("Warmtrennen") ? false : reader.GetInt32("Warmtrennen") != 0,
-                    ProdGleichPack = reader.IsDBNull("Prod_Gleich_Pack") ? false : reader.GetInt32("Prod_Gleich_Pack") != 0,
-                    Kopfgroesse = FormatString(reader.IsDBNull("Packgroesse") ? string.Empty : reader.GetString("Packgroesse")),
-                    Packgroesse = FormatString(reader.IsDBNull("Packgroesse") ? string.Empty : reader.GetString("Packgroesse")),
-                    MaschinenTyp = reader.IsDBNull("manuelle_buchung") ? 0 : reader.GetInt32("manuelle_buchung"),
-                    StueckzahlDirekt = reader.IsDBNull("stueckzahldirekt") ? false : reader.GetInt32("stueckzahldirekt") == 1,
-                    SpannzeitToleranz = reader.IsDBNull("spannzeittol") ? 0 : reader.GetInt32("spannzeittol")
+                    Lizenz = reader.IsNull("Lizenz") ? string.Empty : reader.GetString("Lizenz"),
+                    Maschine = reader.IsNull("Kennung") ? string.Empty : reader.GetString("Kennung"),
+                    KURZKENNUNG = reader.IsNull("KURZKENNUNG") ? string.Empty : reader.GetString("KURZKENNUNG"),
+                    MaschNr = reader.IsNull("Datenblock") ? string.Empty : reader.GetString("Datenblock"),
+                    MaschNrEcht = reader.IsNull("Maschnr") ? string.Empty : reader.GetString("Maschnr"),
+                    SORT_MASCHPANEL = reader.IsNull("SORT_MASCHPANEL") ? 0 : reader.GetInt32("SORT_MASCHPANEL"),
+                    MaschAktiv = reader.IsNull("MaschAktiv") ? false : reader.GetInt32("MaschAktiv") != 0,
+                    Datenblock = reader.IsNull("Datenblock") ? (short)0 : reader.GetInt16("Datenblock"),
+                    AutoRuesten = reader.IsNull("Autoruesten") ? false : reader.GetInt32("Autoruesten") == 1,
+                    MaschWarmtrennen = reader.IsNull("Warmtrennen") ? false : reader.GetInt32("Warmtrennen") != 0,
+                    ProdGleichPack = reader.IsNull("Prod_Gleich_Pack") ? false : reader.GetInt32("Prod_Gleich_Pack") != 0,
+                    Kopfgroesse = FormatString(reader.IsNull("Packgroesse") ? string.Empty : reader.GetString("Packgroesse")),
+                    Packgroesse = FormatString(reader.IsNull("Packgroesse") ? string.Empty : reader.GetString("Packgroesse")),
+                    MaschinenTyp = reader.IsNull("manuelle_buchung") ? 0 : reader.GetInt32("manuelle_buchung"),
+                    StueckzahlDirekt = reader.IsNull("stueckzahldirekt") ? false : reader.GetInt32("stueckzahldirekt") == 1,
+                    SpannzeitToleranz = reader.IsNull("spannzeittol") ? 0 : reader.GetInt32("spannzeittol")
                 };
 
                 // Standardwerte setzen
@@ -74,7 +74,7 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
                 if (includis.Packgroesse < 1) includis.Packgroesse = 1;
 
                 // Pruefstation bestimmen
-                var station = reader.IsDBNull("Station") ? string.Empty : reader.GetString("Station");
+                var station = reader.IsNull("Station") ? string.Empty : reader.GetString("Station");
                 includis.Pruefstation = station switch
                 {
                     "" or "einfach" => 1,
@@ -130,43 +130,43 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
             using var reader = db.GetReader(sql);
             while (reader.Read())
             {
-                var lizenz = reader.IsDBNull("Lizenz") ? string.Empty : reader.GetString("Lizenz");
-                var maschNr = reader.IsDBNull("maschnr") ? 0 : reader.GetInt32("maschnr");
+                var lizenz = reader.IsNull("Lizenz") ? string.Empty : reader.GetString("Lizenz");
+                var maschNr = reader.IsNull("maschnr") ? 0 : reader.GetInt32("maschnr");
 
                 // Maschine in IncludisList finden
                 var includis = IncludisList.Find(i => i.Lizenz.Equals(lizenz, StringComparison.OrdinalIgnoreCase));
                 if (includis == null) continue;
 
                 // Auftragsdaten laden
-                includis.Auftrag.AuftragNr = reader.IsDBNull("betriebsauftragnr") ? string.Empty : reader.GetString("betriebsauftragnr");
-                includis.Auftrag.Bezeichnung = reader.IsDBNull("bezeichnung") ? string.Empty : reader.GetString("bezeichnung");
-                includis.Auftrag.Zustaendig = reader.IsDBNull("zustaendig") ? string.Empty : reader.GetString("zustaendig");
-                includis.Auftrag.Signal = reader.IsDBNull("signal") ? string.Empty : reader.GetString("signal");
-                includis.Auftrag.Sollwert = reader.IsDBNull("sollwert") ? 0 : reader.GetInt32("sollwert");
-                includis.Auftrag.SollwertOffset = reader.IsDBNull("sollwert_offset") ? 0 : reader.GetInt32("sollwert_offset");
-                includis.Auftrag.Istwert = reader.IsDBNull("istwert") ? 0 : reader.GetInt32("istwert");
-                includis.Auftrag.IstPRZ = reader.IsDBNull("ist_prz") ? 0 : reader.GetInt32("ist_prz");
-                includis.Auftrag.Ausschuss = reader.IsDBNull("ausschuss") ? 0 : reader.GetInt32("ausschuss");
-                includis.Auftrag.Verpackt = reader.IsDBNull("verpackt") ? 0 : reader.GetInt32("verpackt");
-                includis.Auftrag.Anfahrausschuss = reader.IsDBNull("anfahrausschuss") ? 0 : reader.GetInt32("anfahrausschuss");
-                includis.Auftrag.Vorwarnung = reader.IsDBNull("vorwarnung") ? 0 : reader.GetInt32("vorwarnung");
-                includis.Auftrag.Erzeugt = reader.IsDBNull("erzeugt") ? false : reader.GetString("erzeugt") == "1";
-                includis.Auftrag.VorwarnungErzeugt = reader.IsDBNull("vorwarnung_erzeugt") ? false : reader.GetString("vorwarnung_erzeugt") == "1";
-                includis.Auftrag.Stat = reader.IsDBNull("stat") ? (short)0 : reader.GetInt16("stat");
-                includis.Auftrag.Solltakt = reader.IsDBNull("solltakt") ? 0 : reader.GetInt32("solltakt");
-                includis.Auftrag.StartDatum = reader.IsDBNull("startdatum") ? DateTime.MinValue : reader.GetDateTime("startdatum");
-                includis.Auftrag.EndeDatum = reader.IsDBNull("endedatum") ? DateTime.MinValue : reader.GetDateTime("endedatum");
-                includis.Auftrag.Werkzeug = reader.IsDBNull("werkzeug") ? 0 : reader.GetInt32("werkzeug");
-                includis.Auftrag.WerkzeugNr = reader.IsDBNull("werkzeugnr") ? string.Empty : reader.GetString("werkzeugnr");
-                includis.Auftrag.HalbAuto = reader.IsDBNull("Betriebsart") ? false : reader.GetString("Betriebsart") == "Halbautomatik";
-                includis.Auftrag.Kopfgroesse = reader.IsDBNull("kopfgroesse") ? 0 : reader.GetInt32("kopfgroesse");
-                includis.Auftrag.KAVITAET_SOLL = reader.IsDBNull("kavitaet_soll") ? 0 : reader.GetInt32("kavitaet_soll");
-                includis.Auftrag.Packgroesse = reader.IsDBNull("packgroesse") ? 0 : reader.GetInt32("packgroesse");
-                includis.Auftrag.PALETTENGROESSE = reader.IsDBNull("palettengroesse") ? 0 : reader.GetInt32("palettengroesse");
-                includis.Auftrag.Kunde = reader.IsDBNull("kunde") ? string.Empty : reader.GetString("kunde");
-                includis.Auftrag.Form = reader.IsDBNull("form") ? string.Empty : reader.GetString("form");
-                includis.Auftrag.ProgrammNr = reader.IsDBNull("programm_nr") ? 0 : reader.GetInt32("programm_nr");
-                includis.Auftrag.MasterAuftrag = reader.IsDBNull("masterauftrag") ? false : reader.GetString("masterauftrag") == "1";
+                includis.Auftrag.AuftragNr = reader.IsNull("betriebsauftragnr") ? string.Empty : reader.GetString("betriebsauftragnr");
+                includis.Auftrag.Bezeichnung = reader.IsNull("bezeichnung") ? string.Empty : reader.GetString("bezeichnung");
+                includis.Auftrag.Zustaendig = reader.IsNull("zustaendig") ? string.Empty : reader.GetString("zustaendig");
+                includis.Auftrag.Signal = reader.IsNull("signal") ? string.Empty : reader.GetString("signal");
+                includis.Auftrag.Sollwert = reader.IsNull("sollwert") ? 0 : reader.GetInt32("sollwert");
+                includis.Auftrag.SollwertOffset = reader.IsNull("sollwert_offset") ? 0 : reader.GetInt32("sollwert_offset");
+                includis.Auftrag.Istwert = reader.IsNull("istwert") ? 0 : reader.GetInt32("istwert");
+                includis.Auftrag.IstPRZ = reader.IsNull("ist_prz") ? 0 : reader.GetInt32("ist_prz");
+                includis.Auftrag.Ausschuss = reader.IsNull("ausschuss") ? 0 : reader.GetInt32("ausschuss");
+                includis.Auftrag.Verpackt = reader.IsNull("verpackt") ? 0 : reader.GetInt32("verpackt");
+                includis.Auftrag.Anfahrausschuss = reader.IsNull("anfahrausschuss") ? 0 : reader.GetInt32("anfahrausschuss");
+                includis.Auftrag.Vorwarnung = reader.IsNull("vorwarnung") ? 0 : reader.GetInt32("vorwarnung");
+                includis.Auftrag.Erzeugt = reader.IsNull("erzeugt") ? false : reader.GetString("erzeugt") == "1";
+                includis.Auftrag.VorwarnungErzeugt = reader.IsNull("vorwarnung_erzeugt") ? false : reader.GetString("vorwarnung_erzeugt") == "1";
+                includis.Auftrag.Stat = reader.IsNull("stat") ? (short)0 : reader.GetInt16("stat");
+                includis.Auftrag.Solltakt = reader.IsNull("solltakt") ? 0 : reader.GetInt32("solltakt");
+                includis.Auftrag.StartDatum = reader.IsNull("startdatum") ? DateTime.MinValue : reader.GetDateTime("startdatum");
+                includis.Auftrag.EndeDatum = reader.IsNull("endedatum") ? DateTime.MinValue : reader.GetDateTime("endedatum");
+                includis.Auftrag.Werkzeug = reader.IsNull("werkzeug") ? 0 : reader.GetInt32("werkzeug");
+                includis.Auftrag.WerkzeugNr = reader.IsNull("werkzeugnr") ? string.Empty : reader.GetString("werkzeugnr");
+                includis.Auftrag.HalbAuto = reader.IsNull("Betriebsart") ? false : reader.GetString("Betriebsart") == "Halbautomatik";
+                includis.Auftrag.Kopfgroesse = reader.IsNull("kopfgroesse") ? 0 : reader.GetInt32("kopfgroesse");
+                includis.Auftrag.KAVITAET_SOLL = reader.IsNull("kavitaet_soll") ? 0 : reader.GetInt32("kavitaet_soll");
+                includis.Auftrag.Packgroesse = reader.IsNull("packgroesse") ? 0 : reader.GetInt32("packgroesse");
+                includis.Auftrag.PALETTENGROESSE = reader.IsNull("palettengroesse") ? 0 : reader.GetInt32("palettengroesse");
+                includis.Auftrag.Kunde = reader.IsNull("kunde") ? string.Empty : reader.GetString("kunde");
+                includis.Auftrag.Form = reader.IsNull("form") ? string.Empty : reader.GetString("form");
+                includis.Auftrag.ProgrammNr = reader.IsNull("programm_nr") ? 0 : reader.GetInt32("programm_nr");
+                includis.Auftrag.MasterAuftrag = reader.IsNull("masterauftrag") ? false : reader.GetString("masterauftrag") == "1";
             }
         }
 
@@ -224,8 +224,8 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
             {
                 SignalList.Add(new Signal
                 {
-                    SignalNr = reader.IsDBNull("signalnr") ? 0 : reader.GetInt32("signalnr"),
-                    SignalArt = reader.IsDBNull("signalart") ? 0 : reader.GetInt32("signalart")
+                    SignalNr = reader.IsNull("signalnr") ? 0 : reader.GetInt32("signalnr"),
+                    SignalArt = reader.IsNull("signalart") ? 0 : reader.GetInt32("signalart")
                 });
             }
 
@@ -261,11 +261,11 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
             {
                 StillstandList.Add(new Stillstand
                 {
-                    Stillstandnr = reader.IsDBNull("stillstandnr") ? 0 : reader.GetInt32("stillstandnr"),
-                    Bezeichnung = reader.IsDBNull("bezeichnung") ? string.Empty : reader.GetString("bezeichnung"),
-                    Aktion = reader.IsDBNull("aktion") ? 0 : reader.GetInt32("aktion"),
-                    Gruppe = reader.IsDBNull("gruppe") ? 0 : reader.GetInt32("gruppe"),
-                    Geplant = reader.IsDBNull("geplant") ? false : reader.GetString("geplant") == "1"
+                    Stillstandnr = reader.IsNull("stillstandnr") ? 0 : reader.GetInt32("stillstandnr"),
+                    Bezeichnung = reader.IsNull("bezeichnung") ? string.Empty : reader.GetString("bezeichnung"),
+                    Aktion = reader.IsNull("aktion") ? 0 : reader.GetInt32("aktion"),
+                    Gruppe = reader.IsNull("gruppe") ? 0 : reader.GetInt32("gruppe"),
+                    Geplant = reader.IsNull("geplant") ? false : reader.GetString("geplant") == "1"
                 });
             }
         }
@@ -286,8 +286,8 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
             {
                 MaschZustandList.Add(new MaschZustand
                 {
-                    MaschNr = reader.IsDBNull("maschnr") ? string.Empty : reader.GetString("maschnr"),
-                    Zustand = reader.IsDBNull("zustand") ? 0 : reader.GetInt32("zustand")
+                    MaschNr = reader.IsNull("maschnr") ? string.Empty : reader.GetString("maschnr"),
+                    Zustand = reader.IsNull("zustand") ? 0 : reader.GetInt32("zustand")
                 });
             }
         }
