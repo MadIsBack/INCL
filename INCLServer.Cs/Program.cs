@@ -5,6 +5,7 @@ using INCLUDIS.INCLServer.Cs.Config;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using System.IO;
 
@@ -72,7 +73,7 @@ namespace INCLUDIS.INCLServer.Cs
                     // Services registrieren
                     services.AddHostedService<MainService>(provider =>
                     {
-                        var logger = provider.GetRequiredService<ILogger<MainService>>();
+                        var logger = provider.GetService<ILogger<MainService>>();
                         var tpm = provider.GetRequiredService<TPM>();
                         var dbFactory = provider.GetRequiredService<Func<CommonDB>>();
                         var config = provider.GetRequiredService<INCLServerConfig>();
