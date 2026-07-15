@@ -17,7 +17,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
     {
         private readonly ILogger<ZusatzService> _logger;
         private readonly TPM _tpm;
-        private readonly Func<CommonDB> _dbFactory;
+        private readonly CommonDB _dbFactory;
         private readonly INCLServerConfig _config;
         
         // Status-Flags
@@ -28,7 +28,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
         public ZusatzService(
             ILogger<ZusatzService> logger,
             TPM tpm,
-            Func<CommonDB> dbFactory,
+            CommonDB dbFactory,
             INCLServerConfig config)
         {
             _logger = logger;
@@ -84,14 +84,14 @@ namespace INCLUDIS.INCLServer.Cs.Services
         {
             try
             {
-                using var db = _dbFactory();
+                
                 _logger.LogInformation("Initialisiere Zusatzdaten...");
                 
                 // Aufträge laden
-                ArbeitHelper.LoadAufträge(db);
+                ArbeitHelper.LoadAufträge(_dbFactory);
                 
                 // Letztes Berechnungsdatum abrufen
-                using var reader = db.GetReader("SELECT TOP 1 BerechnungsDatum FROM ZusatzBerechnungen ORDER BY Id DESC");
+                using var reader = _dbFactory.GetReader("SELECT TOP 1 BerechnungsDatum FROM ZusatzBerechnungen ORDER BY Id DESC");
                 if (reader.Read())
                 {
                     _lastDate = reader.GetDateTime("BerechnungsDatum");
@@ -116,29 +116,29 @@ namespace INCLUDIS.INCLServer.Cs.Services
             
             try
             {
-                using var db = _dbFactory();
+             ;
                 _logger.LogInformation("Führe zusätzliche Berechnungen aus...");
                 
                 // Aufträge aktualisieren
-                ArbeitHelper.LoadAufträge(db);
+                ArbeitHelper.LoadAufträge(_dbFactory);
                 
                 // Palettenrest berechnen
-                await PaletteRestBerechnen(db, stoppingToken);
+                await PaletteRestBerechnen(_dbFactory, stoppingToken);
                 
                 // Taktzeit berechnen
-                await TaktzeitBerechnen(db, stoppingToken);
+                await TaktzeitBerechnen(_dbFactory, stoppingToken);
                 
                 // Laufzeit berechnen
-                await LaufzeitBerechnen(db, stoppingToken);
+                await LaufzeitBerechnen(_dbFactory, stoppingToken);
                 
                 // Arbeitsfrei buchen
-                await ArbeitsFreiBuchen(db, stoppingToken);
+                await ArbeitsFreiBuchen(_dbFactory, stoppingToken);
                 
                 // Rüstzeit-Autobuchung prüfen
-                HelperFunctions.ProcessRuestenAutoBuchen(db);
+                HelperFunctions.ProcessRuestenAutoBuchen(_dbFactory);
                 
                 // Statistiken berechnen
-                HelperFunctions.CalculateStatistik(db);
+                HelperFunctions.CalculateStatistik(_dbFactory);
                 
                 // Aktuelles Datum speichern
                 _lastDate = DateTime.Now;

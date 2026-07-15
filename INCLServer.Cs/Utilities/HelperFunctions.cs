@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using INCLUDIS.Utils.CommonDB;
 
 namespace INCLUDIS.INCLServer.Cs.Utilities
 {
@@ -360,24 +361,7 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
             return 0;
         }
 
-        /// <summary>
-        /// Gibt den Schichttyp zurück (portiert von TTT_GetSchichtTyp).
-        /// </summary>
-        public static string GetSchichtTyp(CommonDB db, int maschNr, DateTime datum, int schicht)
-        {
-            var sql = @"
-                SELECT ShiftType FROM SchichtTyp 
-                WHERE MaschNr = @MaschNr AND Datum = @Datum AND Schicht = @Schicht";
-
-            using var reader = db.GetReader(sql, new { MaschNr = maschNr, Datum = datum, Schicht = schicht });
-            
-            if (reader.Read())
-            {
-                return reader.GetString("ShiftType");
-            }
-            
-            return string.Empty;
-        }
+       
 
         /// <summary>
         /// Fügt einen Stillstands-Event ein (portiert von TTT_InsertStillstandEvent).
@@ -550,42 +534,7 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
             // Diese Funktion könnte Lizenzen prüfen
             return true;
         }
-
-        /// <summary>
-        /// Gibt die TPM-Schichtzeit zurück (portiert von TTT_GetTPMSchichtZeit).
-        /// </summary>
-        public static double GetTPMSchichtZeit(int schicht, double datumZeit)
-        {
-            // Beispiel: 8 Stunden pro Schicht
-            return datumZeit + (schicht * 8);
-        }
-
-        /// <summary>
-        /// Gibt das TPM-Schichtdatum zurück (portiert von TTT_GetTPMSchichtDatum).
-        /// </summary>
-        public static double GetTPMSchichtDatum(int schicht, double datumZeit)
-        {
-            return datumZeit;
-        }
-
-        /// <summary>
-        /// Gibt die Arbeitszeit für eine Schicht zurück (portiert von TTT_GetArbeitszeit_Schicht).
-        /// </summary>
-        public static int GetArbeitszeitSchicht(CommonDB db, int maschNr, DateTime datum, int schicht)
-        {
-            var sql = @"
-                SELECT Arbeitszeit FROM SchichtArbeitszeit 
-                WHERE MaschNr = @MaschNr AND Datum = @Datum AND Schicht = @Schicht";
-
-            using var reader = db.GetReader(sql, new { MaschNr = maschNr, Datum = datum, Schicht = schicht });
-            
-            if (reader.Read())
-            {
-                return reader.GetInt32("Arbeitszeit");
-            }
-            
-            return 0;
-        }
+      
 
         /// <summary>
         /// Gibt den Schichttyp zurück (portiert von TTT_GetSchichtTyp).

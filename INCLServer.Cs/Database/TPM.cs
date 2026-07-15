@@ -10,9 +10,9 @@ namespace INCLUDIS.INCLServer.Cs.Database
     /// </summary>
     public class TPM
     {
-        private readonly Func<CommonDB> _dbFactory;
+        private readonly CommonDB _dbFactory;
         
-        public TPM(Func<CommonDB> dbFactory)
+        public TPM(CommonDB dbFactory)
         {
             _dbFactory = dbFactory;
         }
@@ -23,7 +23,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
         /// <param name="schichtId">ID der Schicht</param>
         public void BerechneSchicht(int schichtId)
         {
-            using var db = _dbFactory();
+           
             
             // Beispiel: Leistung für die Schicht berechnen
             var sql = @"
@@ -32,7 +32,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
                     Leistung = @Leistung
                 WHERE Id = @SchichtId";
 
-            db.ExecuteNonQuery(sql, new { SchichtId = schichtId, Leistung = BerechneLeistung(schichtId, db) });
+            _dbFactory.ExecuteNonQuery(sql, new { SchichtId = schichtId, Leistung = BerechneLeistung(schichtId, _dbFactory) });
         }
 
         /// <summary>
@@ -57,7 +57,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
         /// <param name="bisDatum">Enddatum</param>
         public void BerechneStillstandszeiten(int maschNr, DateTime vonDatum, DateTime bisDatum)
         {
-            using var db = _dbFactory();
+            
             
             var sql = @"
                 SELECT StillstandNr, StartZeit, EndeZeit 
@@ -65,7 +65,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
                 WHERE MaschNr = @MaschNr 
                 AND StartZeit BETWEEN @VonDatum AND @BisDatum";
 
-            using var reader = db.GetReader(sql, new { MaschNr = maschNr, VonDatum = vonDatum, BisDatum = bisDatum });
+            using var reader = _dbFactory.GetReader(sql, new { MaschNr = maschNr, VonDatum = vonDatum, BisDatum = bisDatum });
             
             while (reader.Read())
             {
@@ -77,7 +77,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
                 var dauer = (int)(endeZeit - startZeit).TotalMinutes;
                 
                 // Stillstandszeit aktualisieren
-                AktualisiereStillstandsDauer(db, stillstandNr, dauer);
+                AktualisiereStillstandsDauer(_dbFactory, stillstandNr, dauer);
             }
         }
 
@@ -95,14 +95,14 @@ namespace INCLUDIS.INCLServer.Cs.Database
         /// </summary>
         public decimal BerechneGesamtLeistung(int maschNr)
         {
-            using var db = _dbFactory();
+            
             
             var sql = @"
                 SELECT SUM(Stueck) as GesamtStueck 
                 FROM Maschinenleistung 
                 WHERE MaschNr = @MaschNr";
 
-            using var reader = db.GetReader(sql, new { MaschNr = maschNr });
+            using var reader = _dbFactory.GetReader(sql, new { MaschNr = maschNr });
             return reader.Read() && !reader.IsDBNull(0) ? reader.GetDecimal(0) : 0;
         }
 
@@ -111,7 +111,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
         /// </summary>
         public decimal BerechneDurchschnittsLeistung(int maschNr, DateTime vonDatum, DateTime bisDatum)
         {
-            using var db = _dbFactory();
+          
             
             var sql = @"
                 SELECT AVG(StueckProStunde) as AvgLeistung 
@@ -119,7 +119,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
                 WHERE MaschNr = @MaschNr 
                 AND Datum BETWEEN @VonDatum AND @BisDatum";
 
-            using var reader = db.GetReader(sql, new { MaschNr = maschNr, VonDatum = vonDatum, BisDatum = bisDatum });
+            using var reader = _dbFactory.GetReader(sql, new { MaschNr = maschNr, VonDatum = vonDatum, BisDatum = bisDatum });
             return reader.Read() && !reader.IsDBNull(0) ? reader.GetDecimal(0) : 0;
         }
 
@@ -128,7 +128,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
         /// </summary>
         public decimal BerechneAuslastung(int maschNr, DateTime datum)
         {
-            using var db = _dbFactory();
+           
             
             var sql = @"
                 SELECT 
@@ -136,7 +136,7 @@ namespace INCLUDIS.INCLServer.Cs.Database
                 FROM Maschinenprotokoll 
                 WHERE MaschNr = @MaschNr AND Datum = @Datum";
 
-            using var reader = db.GetReader(sql, new { MaschNr = maschNr, Datum = datum });
+            using var reader = _dbFactory.GetReader(sql, new { MaschNr = maschNr, Datum = datum });
             return reader.Read() && !reader.IsDBNull(0) ? reader.GetDecimal(0) : 0;
         }
     }

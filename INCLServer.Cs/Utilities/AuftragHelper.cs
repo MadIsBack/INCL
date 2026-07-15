@@ -73,8 +73,8 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
                 auftrag.ImStatusOptimieren = reader.GetInt32("InPause");
                 auftrag.SollSpannzeitStk = reader.GetInt32("SOLLSPANNZEITSTK");
                 auftrag.SollSpannzeitGes = reader.GetInt32("SOLLSPANNZEITGES");
-                auftrag.planzykluszeit = reader.GetInt32("planzykluszeit");
-                auftrag.ausschussquote = reader.GetInt32("ausschussquote");
+       //         auftrag.planzykluszeit = reader.GetInt32("planzykluszeit");
+       //         auftrag.ausschussquote = reader.GetInt32("ausschussquote");
                 auftrag.InterBezeichnung = reader.GetString("InterBezeichnung");
             }
             
@@ -159,8 +159,8 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
                 OptimiertAktuell = auftrag.OptimiertAktuell,
                 SollSpannzeitStk = auftrag.SollSpannzeitStk,
                 SollSpannzeitGes = auftrag.SollSpannzeitGes,
-                Planzykluszeit = auftrag.planzykluszeit,
-                Ausschussquote = auftrag.ausschussquote,
+         //       Planzykluszeit = auftrag.planzykluszeit,
+         //       Ausschussquote = auftrag.ausschussquote,
                 InterBezeichnung = auftrag.InterBezeichnung,
                 BetriebsAuftragNr = auftrag.BetriebsauftragNr
             });

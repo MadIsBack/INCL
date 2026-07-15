@@ -33,4 +33,10 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="5.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="INCLUDIS.Utils.CommonDB">
+      <HintPath>..\KomponentenCS\INCLUDIS.Utils.CommonDB.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>
