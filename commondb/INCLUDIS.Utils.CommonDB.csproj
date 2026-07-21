@@ -111,12 +111,6 @@
     <Compile Include="CmdParam.cs" />
     <Compile Include="CommonCommand.cs" />
     <Compile Include="CommonDB.cs" />
-    <Compile Include="CommonDbControl.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
-    <Compile Include="CommonDbControl.Designer.cs">
-      <DependentUpon>CommonDbControl.cs</DependentUpon>
-    </Compile>
     <Compile Include="CommonDbExtensions.cs" />
     <Compile Include="CommonParameter.cs" />
     <Compile Include="CommonParameterList.cs" />
@@ -160,9 +154,6 @@
     <Content Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="CommonDbControl.resx">
-      <DependentUpon>CommonDbControl.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>

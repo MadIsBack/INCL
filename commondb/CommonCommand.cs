@@ -31,7 +31,9 @@ namespace INCLUDIS.Utils.CommonDB
 
         public DbParameterCollection Parameters { get { return this.Command.Parameters; } }
 
-        private Log.Log Log;
+//        private Log.Log Log;
+        public Action<string> LogIt { get; set; }
+        public Action<string> LogDaily { get; set; }
 
         public Action<string> LogExternal { get; set; }
         public IDbConnection Connection { get => ((IDbCommand)Command).Connection; set => ((IDbCommand)Command).Connection = value; }
@@ -45,9 +47,9 @@ namespace INCLUDIS.Utils.CommonDB
 
         private string CommandInitializer = string.Empty;
 
-        public CommonCommand(Log.Log log, DatabaseType dbType, DbProviderFactory factory, string connectionString, bool uniCode = false)
+        public CommonCommand(Action<string> log, DatabaseType dbType, DbProviderFactory factory, string connectionString, bool uniCode = false)
         {
-            this.Log = log;
+           // LogIt = log;
             this.DbType = dbType;
             this.Factory = factory;
             this.ConnectionString = connectionString;
@@ -619,8 +621,8 @@ namespace INCLUDIS.Utils.CommonDB
             LogIt(ex.Message);
             LogIt(ex.StackTrace);
 
-            if ((stackTrace != null) && (Log != null))
-                Log.LogCallStack(stackTrace);
+            //if ((stackTrace != null) && (Log != null))
+            //    Log.LogCallStack(stackTrace);
             if (ex.InnerException != null)
                 HandleDBException(ex.InnerException, "SQL - inner Exception");
         }
@@ -630,12 +632,12 @@ namespace INCLUDIS.Utils.CommonDB
             HandleDBException(ex, sql, new StackTrace());
         }
 
-        private void LogIt(string message)
-        {
-            if (Log != null)
-                Log.LogSome(message);
-            LogExternal?.Invoke(message);
-        }
+        //private void LogIt(string message)
+        //{
+        //    if (Log != null)
+        //        Log.LogSome(message);
+        //    LogExternal?.Invoke(message);
+        //}
 
         internal void LogCommand()
         {
@@ -646,14 +648,14 @@ namespace INCLUDIS.Utils.CommonDB
         {
             try
             {
-                if (Log != null)
-                    Log.LogSome(cmd.GetCommandLogString());
+                //if (Log != null)
+                //    Log.LogSome(cmd.GetCommandLogString());
                 LogExternal?.Invoke(cmd.GetCommandLogString());
             }
             catch (Exception exception)
             {
-                if (Log != null)
-                    Log.LogException(exception, "Logging Command ");
+                //if (Log != null)
+                //    Log.LogException(exception, "Logging Command ");
                 throw;
             }
         }

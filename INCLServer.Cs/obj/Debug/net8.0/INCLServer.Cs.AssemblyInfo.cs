@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("INCLServer.Cs")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a280c070ecff4d31d15c65ab352c87b123af718a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1b7552ad92fc8daaf7435b0c02fa89ff21e83257")]
 [assembly: System.Reflection.AssemblyProductAttribute("INCLServer.Cs")]
 [assembly: System.Reflection.AssemblyTitleAttribute("INCLServer.Cs")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

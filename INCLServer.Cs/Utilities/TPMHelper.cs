@@ -331,7 +331,7 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
         /// <summary>
         /// Prüft den Status von TPM und Stillstandsprotokoll (portiert von CCC_CheckStatusTPM_Stillog).
         /// </summary>
-        public static void CheckStatusTPMStillog(CommonDB db)
+        public static Task CheckStatusTPMStillog(CommonDB db)
         {
             var sql = @"
                 SELECT MaschNr, COUNT(*) as Count 
@@ -348,6 +348,7 @@ namespace INCLUDIS.INCLServer.Cs.Utilities
 
                 // Hier könnte weitere Logik folgen
             }
+            return new Task(null);
         }
 
         /// <summary>

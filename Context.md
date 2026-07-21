@@ -343,3 +343,5 @@ dotnet build
 
 - **DBBackupService.cs**:
   - `HelperFunctions.CheckLicenses` in `FuehreBackupDurch` integriert
+  
+- Fehler von Mistral korrigiert und überflüssiges raus genommen. Logging vorerst größtenteils deaktiviert.

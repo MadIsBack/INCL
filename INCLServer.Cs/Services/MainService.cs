@@ -111,7 +111,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
 
             try
             {
-                using var db = _dbFactory();
+                 var db = _dbFactory();
                 _logger.LogInformation("Initialisiere Maschinen- und Includis-Daten...");
                 
                 // Maschinen und Includis-Daten laden
@@ -150,7 +150,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
         {
             try
             {
-                using var db = _dbFactory();
+                var db = _dbFactory();
                 _logger.LogInformation("Prüfe Datenbankverbindung...");
                 
                 // Einfache Abfrage, um die Verbindung zu testen
@@ -176,7 +176,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
             
             try
             {
-                using var db = _dbFactory();
+                var db = _dbFactory();
                 _logger.LogInformation("Lese Daten aus der Datenbank...");
                 
                 // Aufträge aktualisieren
@@ -253,7 +253,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
                     _tpm.BerechneSchicht(schichtId);
                     
                     // A-Felder für die Schicht berechnen
-                    TPMHelper.CalculateAFelderSchicht(db, schichtNummer, DateTime.Today.AddDays(-1));
+                    TPMHelper.CalculateAFelderSchicht(db, schichtNummer, DateTime.Today.AddDays(-1),180);
                 }
             }
             catch (Exception ex)

@@ -37,14 +37,14 @@ namespace INCLUDIS.INCLServer.Cs.Services
             _mainService = mainService;
             
             // Event-Handler für Backup-Anforderungen registrieren
-            _mainService.OnBackupRequired += MainService_OnBackupRequired;
+         //   _mainService.OnBackupRequired += MainService_OnBackupRequired;
         }
 
-        private void MainService_OnBackupRequired(object sender, MainService.BackupEventArgs e)
-        {
-            _logger.LogInformation("Backup-Event empfangen: Backup um {BackupZeitpunkt}", e.BackupZeitpunkt);
-            _ = FuehreBackupDurch(); // Fire-and-Forget
-        }
+        //private void MainService_OnBackupRequired(object sender, MainService.BackupEventArgs e)
+        //{
+        //    _logger.LogInformation("Backup-Event empfangen: Backup um {BackupZeitpunkt}", e.BackupZeitpunkt);
+        //    _ = FuehreBackupDurch(); // Fire-and-Forget
+        //}
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -93,7 +93,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
         {
             try
             {
-                using var db = _dbFactory();
+                var db = _dbFactory();
                 
                 // Beispiel: Prüfen, ob ein Backup in den letzten 24 Stunden durchgeführt wurde
                 using var reader = db.GetReader("SELECT TOP 1 BackupZeitpunkt FROM BackupProtokoll ORDER BY BackupZeitpunkt DESC");
@@ -153,7 +153,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
                 _logger.LogInformation("Backup wird durchgeführt: {BackupDatei}", backupDatei);
                 
                 // Backup in der Datenbank protokollieren
-                using var db = _dbFactory();
+                var db = _dbFactory();
                 var sql = @"
                     INSERT INTO BackupProtokoll (BackupZeitpunkt, BackupDatei, Erfolgreich) 
                     VALUES (@BackupZeitpunkt, @BackupDatei, @Erfolgreich)";
@@ -167,7 +167,7 @@ namespace INCLUDIS.INCLServer.Cs.Services
                 _logger.LogError(ex, "Fehler beim Durchführen des Backups.");
                 
                 // Fehler in der Datenbank protokollieren
-                using var db = _dbFactory();
+                var db = _dbFactory();
                 var sql = @"
                     INSERT INTO BackupProtokoll (BackupZeitpunkt, Fehler) 
                     VALUES (@BackupZeitpunkt, @Fehler)";
@@ -189,12 +189,12 @@ namespace INCLUDIS.INCLServer.Cs.Services
             {
                 // Beispiel für SQL Server mit sqlcmd
                 var sqlCmdPath = "sqlcmd";
-                var backupBefehl = $@"-S {_config.DBServer} -U {_config.DBUser} -P {_config.DBPass} -Q \"BACKUP DATABASE [{_config.DBInitialCatalog}] TO DISK = '{backupDatei}'\"";
+           //     var backupBefehl = $@"-S {_config.DBServer} -U {_config.DBUser} -P {_config.DBPass} -Q \"BACKUP DATABASE [{_config.DBInitialCatalog}] TO DISK = '{backupDatei}'\"";
                 
                 var processInfo = new ProcessStartInfo
                 {
                     FileName = sqlCmdPath,
-                    Arguments = backupBefehl,
+                  //  Arguments = backupBefehl,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,

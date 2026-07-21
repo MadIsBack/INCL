@@ -1,0 +1,6 @@
+G:\cs\Tools2022\vibegit\INCL\INCLServer.Cs\obj\Debug\net8.0\INCLServer.Cs.csproj.AssemblyReference.cache
+G:\cs\Tools2022\vibegit\INCL\INCLServer.Cs\obj\Debug\net8.0\INCLServer.Cs.GeneratedMSBuildEditorConfig.editorconfig
+G:\cs\Tools2022\vibegit\INCL\INCLServer.Cs\obj\Debug\net8.0\INCLServer.Cs.AssemblyInfoInputs.cache
+G:\cs\Tools2022\vibegit\INCL\INCLServer.Cs\obj\Debug\net8.0\INCLServer.Cs.AssemblyInfo.cs
+G:\cs\Tools2022\vibegit\INCL\INCLServer.Cs\obj\Debug\net8.0\INCLServer.Cs.csproj.CoreCompileInputs.cache
+G:\cs\Tools2022\vibegit\INCL\INCLServer.Cs\obj\Debug\net8.0\INCLServer.Cs.sourcelink.json

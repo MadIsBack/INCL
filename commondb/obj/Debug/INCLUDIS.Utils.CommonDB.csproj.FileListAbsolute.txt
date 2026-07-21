@@ -1,0 +1,3 @@
+G:\cs\Tools2022\vibegit\INCL\commondb\obj\Debug\INCLUDIS.Utils.CommonDB.csproj.AssemblyReference.cache
+G:\cs\Tools2022\vibegit\INCL\commondb\obj\Debug\INCLUDIS.Utils.CommonDB.CommonDbControl.resources
+G:\cs\Tools2022\vibegit\INCL\commondb\obj\Debug\INCLUDIS.Utils.CommonDB.csproj.GenerateResource.cache

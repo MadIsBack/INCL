@@ -2,7 +2,7 @@
 using System.Data.Common;
 using System.Data;
 using System.Collections.Generic;
-using INCLUDIS.Utils.Log;
+//using INCLUDIS.Utils.Log;
 using System.Diagnostics;
 
 namespace INCLUDIS.Utils.CommonDB
@@ -16,7 +16,7 @@ namespace INCLUDIS.Utils.CommonDB
         private readonly CommonCommand _command;
         public CommonCommand Command { get { return _command; } }
         //private readonly DataTable _table;
-        public static Log.Log Log;
+        //public static Log.Log Log;
 
         public CommonReader(CommonCommand cmd) : this(cmd, CommandBehavior.Default)
         {
@@ -56,49 +56,49 @@ namespace INCLUDIS.Utils.CommonDB
 
         public void LogException(Exception ex, string cause, DbCommand cmd)
         {
-            if (Log == null)
-                return;
+            //if (Log == null)
+            //    return;
 
-            Log.LogException(ex, cause);
-            Log.LogSome(Environment.StackTrace);
+            //Log.LogException(ex, cause);
+            //Log.LogSome(Environment.StackTrace);
             LogCommand(cmd ?? _command.Command);
         }
 
         private void LogIt(string message, DbCommand cmd)
         {
-            if (Log == null)
-                return;
-            Log.LogSome(message);
+            //if (Log == null)
+            //    return;
+            //Log.LogSome(message);
             LogCommand(cmd);
         }
 
         private void LogCommand(DbCommand cmd)
         {
-            if (Log != null)
-            {
-                if (cmd != null)
-                {
-                    try
-                    {
-                        Log.LogSome(cmd.GetCommandLogString());
-                    }
-                    catch (Exception exception)
-                    {
-                        Log.LogException(exception, "Logging Command ");
-                    }
-                }
-                else if (_command != null)
-                {
-                    try
-                    {
-                        Log.LogSome(_command.GetCommandLogString());
-                    }
-                    catch (Exception exception)
-                    {
-                        Log.LogException(exception, "Logging Command ");
-                    }
-                }
-            }
+            //if (Log != null)
+            //{
+            //    if (cmd != null)
+            //    {
+            //        try
+            //        {
+            //            Log.LogSome(cmd.GetCommandLogString());
+            //        }
+            //        catch (Exception exception)
+            //        {
+            //            Log.LogException(exception, "Logging Command ");
+            //        }
+            //    }
+            //    else if (_command != null)
+            //    {
+            //        try
+            //        {
+            //            Log.LogSome(_command.GetCommandLogString());
+            //        }
+            //        catch (Exception exception)
+            //        {
+            //            Log.LogException(exception, "Logging Command ");
+            //        }
+            //    }
+            //}
         }
 
         public object GetField(string fieldName)

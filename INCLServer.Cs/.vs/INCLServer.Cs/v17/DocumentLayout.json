@@ -1,0 +1,352 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\services\\dbbackupservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:services\\dbbackupservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\services\\mainservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:services\\mainservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\utilities\\tpmhelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:utilities\\tpmhelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\replaceabletoken.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\replaceablelist.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\dbcommandextension.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\commonreader.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\commonparameterlist.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\commonparameter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\commondbextensions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\commoncommand.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8EC9938D-C906-4504-8D2C-B85CCC2B4129}|..\\commondb\\INCLUDIS.Utils.CommonDB.csproj|g:\\cs\\tools2022\\vibegit\\incl\\commondb\\commondb.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\inclserver.cs.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:inclserver.cs.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\MSBuild\\Current\\Bin\\amd64\\Microsoft.Common.CurrentVersion.targets||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\services\\zusatzservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:services\\zusatzservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\utilities\\helperfunctions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:utilities\\helperfunctions.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\database\\tpm.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:database\\tpm.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\utilities\\auftraghelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:utilities\\auftraghelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|g:\\cs\\tools2022\\vibegit\\incl\\inclserver.cs\\utilities\\arbeithelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{69D8621D-2412-F28D-2CC8-762827E9FA33}|INCLServer.Cs.csproj|solutionrelative:utilities\\arbeithelper.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 1269,
+          "SelectedChildIndex": 8,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{7c9c901a-f0d0-45d0-9ebd-7b2748a4b49a}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "ReplaceableToken.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\ReplaceableToken.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\ReplaceableToken.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\ReplaceableToken.cs",
+              "RelativeToolTip": "..\\commondb\\ReplaceableToken.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:41:54.256Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ReplaceableList.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\ReplaceableList.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\ReplaceableList.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\ReplaceableList.cs",
+              "RelativeToolTip": "..\\commondb\\ReplaceableList.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:41:52.942Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "DbCommandExtension.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\DbCommandExtension.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\DbCommandExtension.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\DbCommandExtension.cs",
+              "RelativeToolTip": "..\\commondb\\DbCommandExtension.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:41:51.443Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "CommonReader.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonReader.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\CommonReader.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonReader.cs",
+              "RelativeToolTip": "..\\commondb\\CommonReader.cs",
+              "ViewState": "AgIAAGMAAAAAAAAAAAAmwGQAAAAPAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:41:13.084Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "CommonParameterList.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonParameterList.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\CommonParameterList.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonParameterList.cs",
+              "RelativeToolTip": "..\\commondb\\CommonParameterList.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:41:12.225Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "CommonParameter.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonParameter.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\CommonParameter.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonParameter.cs",
+              "RelativeToolTip": "..\\commondb\\CommonParameter.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:41:11.162Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "CommonDbExtensions.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonDbExtensions.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\CommonDbExtensions.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonDbExtensions.cs",
+              "RelativeToolTip": "..\\commondb\\CommonDbExtensions.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:41:10.045Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "DBBackupService.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Services\\DBBackupService.cs",
+              "RelativeDocumentMoniker": "Services\\DBBackupService.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Services\\DBBackupService.cs*",
+              "RelativeToolTip": "Services\\DBBackupService.cs*",
+              "ViewState": "AgIAAJwAAAAAAAAAAAAiwKkAAAAQAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T13:43:24.074Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MainService.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Services\\MainService.cs",
+              "RelativeDocumentMoniker": "Services\\MainService.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Services\\MainService.cs",
+              "RelativeToolTip": "Services\\MainService.cs",
+              "ViewState": "AgIAAGoAAAAAAAAAAAAUwHEAAAAQAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T13:47:58.824Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "TPMHelper.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Utilities\\TPMHelper.cs",
+              "RelativeDocumentMoniker": "Utilities\\TPMHelper.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Utilities\\TPMHelper.cs",
+              "RelativeToolTip": "Utilities\\TPMHelper.cs",
+              "ViewState": "AgIAAEgBAAAAAAAAAAAUwF0BAAANAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T13:49:53.831Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "CommonCommand.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonCommand.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\CommonCommand.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonCommand.cs",
+              "RelativeToolTip": "..\\commondb\\CommonCommand.cs",
+              "ViewState": "AgIAAIECAAAAAAAAAAAywJECAABGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:37:21.14Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "CommonDB.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonDB.cs",
+              "RelativeDocumentMoniker": "..\\commondb\\CommonDB.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\commondb\\CommonDB.cs",
+              "RelativeToolTip": "..\\commondb\\CommonDB.cs",
+              "ViewState": "AgIAAHcDAAAAAAAAAAAswIkDAAAvAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-21T09:36:05.416Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "INCLServer.Cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\INCLServer.Cs.csproj",
+              "RelativeDocumentMoniker": "INCLServer.Cs.csproj",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\INCLServer.Cs.csproj",
+              "RelativeToolTip": "INCLServer.Cs.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-07-21T09:34:19.135Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "Program.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAPAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T13:42:20.543Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "Microsoft.Common.CurrentVersion.targets",
+              "DocumentMoniker": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\MSBuild\\Current\\Bin\\amd64\\Microsoft.Common.CurrentVersion.targets",
+              "ToolTip": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional\\MSBuild\\Current\\Bin\\amd64\\Microsoft.Common.CurrentVersion.targets",
+              "ViewState": "AgIAAK8JAAAAAAAAAAAjwIAJAAAEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003801|",
+              "WhenOpened": "2026-07-15T13:37:57.074Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "HelperFunctions.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Utilities\\HelperFunctions.cs",
+              "RelativeDocumentMoniker": "Utilities\\HelperFunctions.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Utilities\\HelperFunctions.cs",
+              "RelativeToolTip": "Utilities\\HelperFunctions.cs",
+              "ViewState": "AgIAABICAAAAAAAAAMBcwBgCAAAGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T12:36:46.612Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "AuftragHelper.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Utilities\\AuftragHelper.cs",
+              "RelativeDocumentMoniker": "Utilities\\AuftragHelper.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Utilities\\AuftragHelper.cs",
+              "RelativeToolTip": "Utilities\\AuftragHelper.cs",
+              "ViewState": "AgIAAHMAAAAAAAAAAAAQwH8AAAAXAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T08:32:26.286Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 19,
+              "Title": "ArbeitHelper.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Utilities\\ArbeitHelper.cs",
+              "RelativeDocumentMoniker": "Utilities\\ArbeitHelper.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Utilities\\ArbeitHelper.cs",
+              "RelativeToolTip": "Utilities\\ArbeitHelper.cs",
+              "ViewState": "AgIAAJUAAAAAAAAAAAAqwCwAAAArAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T08:25:38.182Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "ZusatzService.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Services\\ZusatzService.cs",
+              "RelativeDocumentMoniker": "Services\\ZusatzService.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Services\\ZusatzService.cs",
+              "RelativeToolTip": "Services\\ZusatzService.cs",
+              "ViewState": "AgIAAEIAAAAAAAAAAAAhwBUAAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T08:25:28.785Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "TPM.cs",
+              "DocumentMoniker": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Database\\TPM.cs",
+              "RelativeDocumentMoniker": "Database\\TPM.cs",
+              "ToolTip": "G:\\cs\\Tools2022\\vibegit\\INCL\\INCLServer.Cs\\Database\\TPM.cs",
+              "RelativeToolTip": "Database\\TPM.cs",
+              "ViewState": "AgIAAHgAAAAAAAAAAAAMwIoAAAApAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-15T08:22:37.905Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

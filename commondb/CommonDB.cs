@@ -9,7 +9,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System;
 using INCLUDIS.Utils.CommonDB.Attributed;
-using INCLUDIS.Utils.Log;
+
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
@@ -22,7 +22,7 @@ namespace INCLUDIS.Utils.CommonDB
     /// <summary>
     /// Provides a common connection to ALL db types.
     /// </summary>
-    public class CommonDB : DLLBase
+    public class CommonDB
     {
         //public const string ProviderSQLServer = "System.Data.SqlClient";
         //public const string ProviderOracle = "System.Data.OracleClient";
@@ -65,15 +65,15 @@ namespace INCLUDIS.Utils.CommonDB
         public Boolean IsMssql { get { return new[] { DatabaseType.dtMSSQL }.Contains(DBType); } }
         public bool IsUnicode {  get { return _unicode; } }
 
-        private Log.Log _log;
+      //  private Log.Log _log;
 
         public DbProviderFactory ProviderFactory => _provider;
 
-        public Log.Log LOG
-        {
-            get { return this._log; }
-            set { this._log = value; if (value == null || CommonReader.Log == null) CommonReader.Log = this._log; }
-        }
+  //      public Log.Log LOG
+   //     {
+   //         get { return this._log; }
+  //          set { this._log = value; if (value == null || CommonReader.Log == null) CommonReader.Log = this._log; }
+   //     }
 
         public enum DatabaseType
         {
@@ -395,7 +395,7 @@ namespace INCLUDIS.Utils.CommonDB
 
         public CommonCommand NewCommonCommand(string query = null)
         {
-            var command = new CommonCommand(this.LOG, this.DBType, this._provider, this._connectionString, this._unicode);
+            var command = new CommonCommand(LogIt, this.DBType, this._provider, this._connectionString, this._unicode);
             command.LogExternal = this.LogExternal;
             if (query != null && !string.IsNullOrEmpty(query.Trim())) command.CommandText = query;
             return command;
@@ -489,7 +489,7 @@ namespace INCLUDIS.Utils.CommonDB
             }
             catch (Exception ex)
             {
-                HandleDBException(ex, cmd.CommandText);
+                //HandleDBException(ex, cmd.CommandText);
                 this.LogException(ex, aCommand);
                 i = -1;
             }
@@ -583,15 +583,15 @@ namespace INCLUDIS.Utils.CommonDB
                 {
                     ex = ex2;
                 }
-                HandleDBException(ex, "Checking real state of DB connection");
+                //HandleDBException(ex, "Checking real state of DB connection");
                 return false;
             }            
         }
 
         private void LogIt(string message)
         {
-            if (LOG != null)
-                LOG.LogSome(message);
+            //if (LOG != null)
+            //    LOG.LogSome(message);
             LogExternal?.Invoke(message);
         }
 
@@ -628,7 +628,7 @@ namespace INCLUDIS.Utils.CommonDB
             }
             catch (Exception ex)
             {
-                HandleDBException(ex, baseQuery);
+                //HandleDBException(ex, baseQuery);
                 this.LogException(ex, baseQuery);
                 return false;
             }
@@ -818,7 +818,7 @@ namespace INCLUDIS.Utils.CommonDB
             }
             catch (Exception ex)
             {
-                HandleDBException(ex, cmd.CommandText);
+                //HandleDBException(ex, cmd.CommandText);
                 LogException(ex, String.Format("Creating parametrized query based on '{0}'", baseQuery));
                 throw;
             }
@@ -902,8 +902,8 @@ namespace INCLUDIS.Utils.CommonDB
             LogIt(ex.Message);
             LogIt(ex.StackTrace);
 
-            if ((stackTrace != null) && (LOG != null))
-                LOG.LogCallStack(stackTrace);
+            //if ((stackTrace != null) && (LOG != null))
+            //    LOG.LogCallStack(stackTrace);
             if (ex.InnerException != null)
                 LogException(ex.InnerException, "SQL - inner Exception");
         }
@@ -949,7 +949,7 @@ namespace INCLUDIS.Utils.CommonDB
             }
             catch (Exception ex)
             {
-                HandleDBException(ex, cmd.CommandText);
+               // HandleDBException(ex, cmd.CommandText);
                 this.LogException(ex, "Safe Executing Command", new StackTrace());
                 return false;
             }
@@ -971,7 +971,7 @@ namespace INCLUDIS.Utils.CommonDB
             }
             catch (Exception ex)
             {
-                HandleDBException(ex, cmd.CommandText);
+                //HandleDBException(ex, cmd.CommandText);
                 this.LogException(ex, "Safe Executing Command", new StackTrace());
                 return false;
             }
