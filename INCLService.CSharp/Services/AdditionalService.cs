@@ -1,4 +1,5 @@
 using INCLService.CSharp.Utilities;
+using INCLService.CSharp.Utilities;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +20,7 @@ namespace INCLService.CSharp.Services
         private readonly AppConfig _appConfig;
         private CommonDB _database;
         private int _priority = 4;
+        private ArbeitUtils _arbeitUtils;
         private int _timerInterval = 600;
         private DateTime _lastExecution = DateTime.MinValue;
         
@@ -33,6 +35,7 @@ namespace INCLService.CSharp.Services
         public bool INCL_KeinWP_Bei_Laufzeit_In_Schicht { get; set; } = false;
         public bool INCL_Autobuchen_nach_Arbeitsfrei { get; set; } = false;
         public int VerpacktSchichtNachberechnen { get; set; } = 0;
+        public int SHORT_DELAY_AUTO_BOOK_VALUE { get; set; } = 5; // Minuten
         public int Schicht1 { get; set; } = 6;
         public int Schicht2 { get; set; } = 14;
         public int Schicht3 { get; set; } = 22;
@@ -46,6 +49,7 @@ namespace INCLService.CSharp.Services
             _configuration.GetSection("Main").Bind(_appConfig.Main);
             LoadConfiguration();
             InitializeDatabase();
+            InitializeArbeitUtils();
         }
 
         private void LoadConfiguration()
@@ -62,6 +66,7 @@ namespace INCLService.CSharp.Services
             INCL_KeinWP_Bei_Laufzeit_In_Schicht = _configuration.GetValue<bool>("Features:INCL_KeinWP_Bei_Laufzeit_In_Schicht", false);
             INCL_Autobuchen_nach_Arbeitsfrei = _configuration.GetValue<bool>("Features:INCL_Autobuchen_nach_Arbeitsfrei", false);
             VerpacktSchichtNachberechnen = _configuration.GetValue<int>("Features:VerpacktSchichtNachberechnen", 0);
+            SHORT_DELAY_AUTO_BOOK_VALUE = _configuration.GetValue<int>("Features:SHORT_DELAY_AUTO_BOOK_VALUE", 5);
             Schicht1 = _configuration.GetValue<int>("Shift:Schicht1", 6);
             Schicht2 = _configuration.GetValue<int>("Shift:Schicht2", 14);
             Schicht3 = _configuration.GetValue<int>("Shift:Schicht3", 22);
@@ -77,6 +82,12 @@ namespace INCLService.CSharp.Services
                 InitialCatalog = _appConfig.Database.InitialCatalog,
                 SqlProvider = _appConfig.Database.Provider
             };
+        }
+
+        private void InitializeArbeitUtils()
+        {
+            _arbeitUtils = new ArbeitUtils(_logger, _database);
+        };
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -390,16 +401,133 @@ namespace INCLService.CSharp.Services
             {
                 _logger.LogDebug("ArbeitsFrei_Buchen started");
                 
-                // Arbeitsfrei-Zeiten für Maschinen buchen
-                // Hier würde die komplexe Logik aus Delphi implementiert werden
-                // Für jetzt eine vereinfachte Version
-                
                 DateTime jetzt = DateTime.Now;
+                bool keinWPBeiLZ = INCL_KeinWP_Bei_Laufzeit_In_Schicht;
+                
+                // Arbeitsfrei nur buchen, wenn kein Laufzeit in der Schicht vorhanden
+                // Wenn Laufzeit vorhanden, nur den letzten/ersten Stillstand der Schicht
+                // der über die Schicht hinaus geht
+                
+                // Schichtstart berechnen
+                DateTime schichtstartref;
+                if (keinWPBeiLZ)
+                {
+                    int aktuelleSchicht = GetSchichtNr(jetzt);
+                    schichtstartref = jetzt.Date.AddHours(GetSchichtStartFloat(GetGruppe("DEFAULT"), aktuelleSchicht)).AddMinutes(1);
+                }
+                else
+                {
+                    schichtstartref = jetzt; // Wenn nicht, dann ist kommt immer kleiner als jetzt
+                }
                 
                 // Offene Stillstände prüfen
                 string sql = $@"SELECT Nr, MaschNr, Kommt, StillstandNr 
                     FROM TPM_Stillog 
-                    WHERE Geht = 0 AND Kommt < '{FloatToPunktStr(jetzt)}' 
+                    WHERE Geht = 0 AND Kommt < '{jetzt:yyyy-MM-dd HH:mm:ss}' 
+                    ORDER BY MaschNr";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        int maschNr = reader.GetInt32(1);
+                        DateTime kommt = reader.GetDateTime(2);
+                        int stillstandNr = reader.GetInt32(3);
+                        string nr = reader.GetString(0);
+                        
+                        string lizenz = await GetMaschineAsync(maschNr, stoppingToken);
+                        int gruppe = GetGruppe(lizenz);
+                        
+                        bool aktuellArbeitsfrei = IsMomentArbeitsFrei(gruppe, jetzt);
+                        bool letzteSchichtArbeitsfrei = IsMomentArbeitsFrei(gruppe, schichtstartref.AddMinutes(-1));
+                        
+                        // AFGesperrtArray prüfen (vereinfacht)
+                        bool afGesperrt = false; // Hier würde aus Maschinen-Tabelle gelesen werden
+                        
+                        if (afGesperrt)
+                        {
+                            letzteSchichtArbeitsfrei = false;
+                        }
+                        
+                        if (letzteSchichtArbeitsfrei) // Vorgängerschicht war Arbeitsfrei
+                        {
+                            // Liegt Stillstand Anfang 1/2 in letzter Schicht?
+                            double laengeLetzteSchicht = 0;
+                            if (Schicht1 == 1) laengeLetzteSchicht = (Schicht1 + 1) - Schicht3;
+                            if (Schicht1 == 2) laengeLetzteSchicht = Schicht2 - Schicht1;
+                            if (Schicht1 == 3) laengeLetzteSchicht = Schicht3 - Schicht2;
+                            
+                            bool checkArbeitsfrei = false;
+                            bool endeStillUndNeu = false;
+                            bool vorSchichtStillstandBuchen = false;
+                            
+                            if (stillstandNr == 1) // Nicht gebucht
+                            {
+                                await _arbeitUtils.ChangeDtCodeAsync(3, int.Parse(nr), true, "AF960", stoppingToken);
+                                checkArbeitsfrei = true;
+                            }
+                            else if (stillstandNr == 3) // Letzter Stillstand Arbeitsfrei gebucht
+                            {
+                                checkArbeitsfrei = true;
+                            }
+                            
+                            if (checkArbeitsfrei)
+                            {
+                                if (!aktuellArbeitsfrei)
+                                {
+                                    endeStillUndNeu = true;
+                                    vorSchichtStillstandBuchen = true;
+                                }
+                            }
+                            
+                            if (endeStillUndNeu)
+                            {
+                                // Aktuellen Stillstand zum Schichtwechsel beenden und neuen erzeugen
+                                sql = $@"UPDATE TPM_Stillog SET Geht = '{schichtstartref:yyyy-MM-dd HH:mm:ss}' 
+                                    WHERE Nr = {nr}";
+                                using (var command = _database.CreateCommand(sql))
+                                {
+                                    await command.ExecuteNonQueryAsync(stoppingToken);
+                                }
+                                
+                                // Neuer Stillstand
+                                sql = $@"INSERT INTO TPM_Stillog (Nr, MaschNr, Kommt, Geht, Stillstandnr, schusszaehler, prodzaehler) 
+                                    VALUES (TPM_StillogID.NextVal, {maschNr}, '{schichtstartref:yyyy-MM-dd HH:mm:ss}', 0, 1, 0, 0)";
+                                using (var command = _database.CreateCommand(sql))
+                                {
+                                    await command.ExecuteNonQueryAsync(stoppingToken);
+                                }
+                            }
+                            
+                            if (vorSchichtStillstandBuchen && INCL_Autobuchen_nach_Arbeitsfrei)
+                            {
+                                // Aktuellen Stillstand mit altem Grund buchen
+                                int stillNr = 1; // Standard
+                                sql = $@"SELECT TOP 1 StillstandNr FROM TPM_Stillog 
+                                    WHERE MaschNr = {maschNr} AND StillstandNr <> 3 
+                                    ORDER BY Kommt DESC";
+                                using (var reader2 = _database.ExecuteReader(sql))
+                                {
+                                    if (await reader2.ReadAsync(stoppingToken))
+                                    {
+                                        stillNr = reader2.GetInt32(0);
+                                    }
+                                }
+                                
+                                // Bei letztem Stillstand Kurzstörung Stillstand nicht gebucht buchen
+                                await _arbeitUtils.ChangeDtCodeAsync(stillNr, int.Parse(nr), true, "AF1016", stoppingToken);
+                            }
+                        }
+                    }
+                }
+                
+                _logger.LogDebug("ArbeitsFrei_Buchen completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in ArbeitsFrei_Buchen");
+            }
+        }' 
                     ORDER BY MaschNr";
                 
                 using (var reader = _database.ExecuteReader(sql))
@@ -442,14 +570,124 @@ namespace INCLService.CSharp.Services
             {
                 _logger.LogDebug("Book_Short_Delay started");
                 
-                // Kurze Verzögerungen automatisch buchen
-                // Hier würde die Logik aus Delphi implementiert werden
+                // Prüfen, ob Maschinen.SHORT_DELAY > 0
+                int shortDelaySum = 0;
+                using (var reader = _database.ExecuteReader("SELECT Sum(Short_Delay) CNT FROM Maschine"))
+                {
+                    if (await reader.ReadAsync(stoppingToken))
+                    {
+                        shortDelaySum = reader.GetInt32(0);
+                    }
+                }
                 
-                DateTime jetzt = DateTime.Now;
-                DateTime cutoff = jetzt.AddMinutes(-5); // Letzte 5 Minuten
+                if (shortDelaySum == 0)
+                {
+                    // Standard: SHORT_DELAY_AUTO_BOOK_VALUE
+                    string sql = $@"SELECT count(*) cnt FROM TPM_Stillog 
+                        WHERE Geht > 0 AND StillstandNr = 1 
+                        AND (DATEDIFF(MINUTE, Kommt, Geht)) < {SHORT_DELAY_AUTO_BOOK_VALUE}";
+                    
+                    using (var reader = _database.ExecuteReader(sql))
+                    {
+                        if (await reader.ReadAsync(stoppingToken))
+                        {
+                            _logger.LogDebug("Short Delays to book: {Count}", reader.GetInt32(0));
+                        }
+                    }
+                    
+                    sql = @"SELECT ts.NR, mi.BETRIEBSAUFTRAGNR, mi.LIZENZ, mi.WERKZEUG, mi.ARTIKELNR, 
+                        s.stillstand, mi.stueck, s2.stillstand alterstillstand
+                        FROM TPM_STILLOG ts
+                        LEFT JOIN MASCHINE m ON m.maschnr = ts.maschnr
+                        LEFT JOIN MASCHINF mi ON m.lizenz = mi.lizenz
+                        LEFT JOIN TPM_STILLSTAENDE s ON s.STILLSTANDNR = 5
+                        LEFT JOIN TPM_STILLSTAENDE s2 ON s2.stillstandnr = ts.stillstandnr
+                        WHERE ts.STILLSTANDNR = 1
+                        AND Geht > 0 AND ts.StillstandNr = 1 
+                        AND (DATEDIFF(MINUTE, Kommt, Geht)) < @ShortDelayValue";
+                    
+                    using (var reader = _database.ExecuteReader(sql))
+                    {
+                        reader.Parameters.AddWithValue("@ShortDelayValue", SHORT_DELAY_AUTO_BOOK_VALUE);
+                        
+                        int count = 0;
+                        while (await reader.ReadAsync(stoppingToken))
+                        {
+                            int nr = reader.GetInt32(0);
+                            // Stillstand auf Kurzstörung (Nr=5) ändern
+                            await _arbeitUtils.ChangeDtCodeAsync(5, nr, true, "BSD1534", stoppingToken);
+                            count++;
+                        }
+                        _logger.LogDebug("Short Delays (0) = {Count}", count);
+                    }
+                }
+                else
+                {
+                    // Maschinen-spezifische SHORT_DELAY Werte
+                    string sql = @"SELECT count(*) cnt FROM TPM_Stillog ts
+                        WHERE ts.Nr IN
+                        ( SELECT TPM_Stillog.Nr
+                          FROM TPM_Stillog, Maschine
+                          WHERE TPM_Stillog.MaschNr = Maschine.MaschNr
+                          AND StillstandNr = 1
+                          AND Maschine.SHORT_DELAY > 0 and Geht > 0
+                          AND (DATEDIFF(MINUTE, Kommt, Geht)) <= Maschine.SHORT_DELAY
+                        )";
+                    
+                    using (var reader = _database.ExecuteReader(sql))
+                    {
+                        if (await reader.ReadAsync(stoppingToken))
+                        {
+                            _logger.LogDebug("Short Delays to book: {Count}", reader.GetInt32(0));
+                        }
+                    }
+                    
+                    sql = @"SELECT ts.NR, mi.BETRIEBSAUFTRAGNR, mi.LIZENZ, mi.WERKZEUG, mi.ARTIKELNR, 
+                        s.stillstand, mi.stueck, s2.stillstand alterstillstand
+                        FROM TPM_STILLOG ts
+                        LEFT JOIN MASCHINE m ON m.maschnr = ts.maschnr
+                        LEFT JOIN MASCHINF mi ON m.lizenz = mi.lizenz
+                        LEFT JOIN TPM_STILLSTAENDE s ON s.STILLSTANDNR = 5
+                        LEFT JOIN TPM_STILLSTAENDE s2 ON s2.stillstandnr = ts.stillstandnr
+                        WHERE ts.STILLSTANDNR = 1
+                        AND ts.Nr in
+                        ( SELECT TPM_Stillog.Nr
+                          FROM TPM_Stillog, Maschine
+                          WHERE TPM_Stillog.MaschNr = Maschine.MaschNr
+                          AND StillstandNr = 1
+                          AND Maschine.SHORT_DELAY > 0 and Geht > 0
+                          AND (DATEDIFF(MINUTE, Kommt, Geht)) <= Maschine.SHORT_DELAY
+                        )";
+                    
+                    using (var reader = _database.ExecuteReader(sql))
+                    {
+                        int count = 0;
+                        while (await reader.ReadAsync(stoppingToken))
+                        {
+                            int nr = reader.GetInt32(0);
+                            // Prüfen, ob der vorherige Stillstand auch Kurzstörung war
+                            int stillNr = 5; // Standard: Kurzstörung
+                            
+                            // Wenn der vorherige Stillstand nicht Kurzstörung war, behalten
+                            if (reader.GetString(7) != "Kurzstörung")
+                            {
+                                stillNr = reader.GetInt32(6); // Alter Stillstand
+                            }
+                            
+                            await _arbeitUtils.ChangeDtCodeAsync(stillNr, nr, true, "AF1016", stoppingToken);
+                            count++;
+                        }
+                        _logger.LogDebug("Short Delays (1) = {Count}", count);
+                    }
+                }
                 
-                string sql = $@"SELECT * FROM Stillstandslog 
-                    WHERE StillstandNr = 5 AND Kommt >= '{FloatToPunktStr(cutoff)}' 
+                _logger.LogDebug("Book_Short_Delay completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Book_Short_Delay");
+            }
+        }' 
                     AND Geht = 0";
                 
                 using (var reader = _database.ExecuteReader(sql))
@@ -649,6 +887,16 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("CheckPackSchicht started for {Tage} days", tage);
+                int result = await _arbeitUtils.CheckPackSchichtAsync(tage, stoppingToken);
+                _logger.LogDebug("CheckPackSchicht completed - {Result} records checked", result);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in CheckPackSchicht");
+                return 0;
+            }
+        } days", tage);
                 // Platzhalter - Implementierung folgt
                 return 0;
             }
@@ -664,8 +912,14 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("Laufzeit_Berechnen started");
-                // Platzhalter - Implementierung folgt
+                await _arbeitUtils.LaufzeitBerechnenAsync(stoppingToken);
+                _logger.LogDebug("Laufzeit_Berechnen completed");
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Laufzeit_Berechnen");
+            }
+        }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in Laufzeit_Berechnen");
@@ -677,8 +931,14 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("Check_TaktLog started");
-                // Platzhalter - Implementierung folgt
+                await _arbeitUtils.CheckTaktLogAsync(stoppingToken);
+                _logger.LogDebug("Check_TaktLog completed");
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Check_TaktLog");
+            }
+        }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in Check_TaktLog");
