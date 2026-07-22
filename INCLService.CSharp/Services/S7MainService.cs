@@ -18,9 +18,8 @@ namespace INCLService.CSharp.Services
         private readonly ILogger<S7MainService> _logger;
         private readonly IConfiguration _configuration;
         private readonly AppConfig _appConfig;
-        private readonly IServiceProvider _serviceProvider;
-        private CommonDB _database;
         
+        private CommonDB _database;
         private bool _hochlauf = true;
         private bool _firstLauf = true;
         private bool _datenEnabled = true;
@@ -29,12 +28,6 @@ namespace INCLService.CSharp.Services
         // Timer-Intervalle aus Konfiguration
         private int _mainTimerInterval = 15; // Sekunden
         private int _aliveTimerInterval = 15; // Sekunden
-        
-        // Verweise auf die Thread-Services
-        private ShiftService _shiftService;
-        private DBBackupService _dbBackupService;
-        private SignalLogService _signalLogService;
-        private AdditionalService _additionalService;
         
         // Konfigurationseinstellungen
         public bool Pruefen { get; set; } = false;
@@ -59,14 +52,10 @@ namespace INCLService.CSharp.Services
 
         public S7MainService(
             ILogger<S7MainService> logger,
-            IConfiguration configuration,
-            IServiceProvider serviceProvider,
-            CommonDB database)
+            IConfiguration configuration)
         {
             _logger = logger;
             _configuration = configuration;
-            _serviceProvider = serviceProvider;
-            _database = database;
             
             _appConfig = new AppConfig();
             _configuration.GetSection("Database").Bind(_appConfig.Database);
@@ -75,8 +64,32 @@ namespace INCLService.CSharp.Services
             // Servername setzen
             ServerNameDesDienstes = Environment.MachineName.ToUpper();
             
+            // Eigene Datenbankverbindung initialisieren
+            InitializeDatabase();
+            
             // Konfiguration aus appsettings.json laden
             LoadConfiguration();
+        }
+
+        private void InitializeDatabase()
+        {
+            try
+            {
+                _database = new CommonDB
+                {
+                    UserName = _appConfig.Database.DB_User,
+                    Password = _appConfig.Database.DB_Pass,
+                    Server = _appConfig.Database.DB_Server,
+                    InitialCatalog = _appConfig.Database.InitialCatalog,
+                    SqlProvider = _appConfig.Database.Provider
+                };
+                
+                _logger.LogInformation("S7MainService database initialized");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initializing S7MainService database");
+            }
         }
 
         private void LoadConfiguration()
@@ -118,32 +131,6 @@ namespace INCLService.CSharp.Services
             }
         }
 
-        private void CreateThreads()
-        {
-            try
-            {
-                _logger.LogInformation("Creating thread services...");
-                
-                // Shift Service erstellen und starten
-                _shiftService = _serviceProvider.GetService<ShiftService>();
-                
-                // DB Backup Service
-                _dbBackupService = _serviceProvider.GetService<DBBackupService>();
-                
-                // Signal Log Service
-                _signalLogService = _serviceProvider.GetService<SignalLogService>();
-                
-                // Additional Service
-                _additionalService = _serviceProvider.GetService<AdditionalService>();
-                
-                _logger.LogInformation("All thread services created successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating thread services");
-            }
-        }
-
         private async Task Timer1TimerAsync(CancellationToken stoppingToken)
         {
             try
@@ -160,7 +147,7 @@ namespace INCLService.CSharp.Services
                 if (_firstLauf)
                 {
                     _firstLauf = false;
-                    CreateThreads();
+                    _logger.LogInformation("Erster Lauf abgeschlossen");
                 }
                 
                 // Datenbank-Operationen
@@ -169,11 +156,32 @@ namespace INCLService.CSharp.Services
                     // Daten lesen und verarbeiten
                     await ReadDataAsync(stoppingToken);
                 }
+                else if (_database != null && !_database.Connected)
+                {
+                    // Versuchen, die Verbindung wiederherzustellen
+                    await ReconnectDatabaseAsync(stoppingToken);
+                }
             }
             catch (Exception ex)
             {
                 _errorCount++;
                 _logger.LogError(ex, "Error in Timer1Timer (Count: {Count})", _errorCount);
+            }
+        }
+
+        private async Task ReconnectDatabaseAsync(CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogWarning("Attempting to reconnect database...");
+                _database.Connected = false;
+                await Task.Delay(5000, stoppingToken); // 5 Sekunden warten
+                _database.Connected = true;
+                _logger.LogInformation("Database reconnected successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reconnecting database");
             }
         }
 
@@ -193,6 +201,21 @@ namespace INCLService.CSharp.Services
                         _logger.LogDebug("Setup data loaded");
                     }
                 }
+                
+                // Beispiel: Maschinenstatus lesen
+                using (var reader = _database.ExecuteReader(
+                    "SELECT MaschinenNr, Status, LetzteAenderung FROM Maschinenstatus WHERE Aktiv = 1"))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        var maschinenNr = reader.GetInt32(0);
+                        var status = reader.GetString(1);
+                        var letzteAenderung = reader.GetDateTime(2);
+                        
+                        _logger.LogDebug("Maschine {Nr}: Status={Status}, Letzte Änderung={Zeit}",
+                            maschinenNr, status, letzteAenderung);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -206,6 +229,20 @@ namespace INCLService.CSharp.Services
             
             try
             {
+                // Datenbankverbindung herstellen
+                if (_database != null)
+                {
+                    try
+                    {
+                        _database.Connected = true;
+                        _logger.LogInformation("S7MainService database connected");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error connecting S7MainService database");
+                    }
+                }
+                
                 // Initialisierung
                 await InitializeAsync(stoppingToken);
                 
@@ -224,6 +261,18 @@ namespace INCLService.CSharp.Services
             }
             finally
             {
+                // Datenbankverbindung schließen
+                if (_database != null && _database.Connected)
+                {
+                    try
+                    {
+                        _database.Connected = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error disconnecting S7MainService database");
+                    }
+                }
                 _logger.LogInformation("S7MainService stopped");
             }
         }
@@ -280,18 +329,6 @@ namespace INCLService.CSharp.Services
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("S7MainService stopping...");
-            
-            // Alle Thread-Services stoppen
-            try
-            {
-                // Hier würden die Services gestoppt werden
-                _logger.LogInformation("All thread services stopped");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error stopping thread services");
-            }
-            
             await base.StopAsync(cancellationToken);
         }
     }

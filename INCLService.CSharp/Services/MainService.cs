@@ -30,16 +30,22 @@ namespace INCLService.CSharp.Services
         {
             _logger = logger;
             _configuration = configuration;
+            
+            // Konfiguration laden
             _appConfig = new AppConfig();
             _configuration.GetSection("Database").Bind(_appConfig.Database);
             _configuration.GetSection("Main").Bind(_appConfig.Main);
+            
             SetDBUser();
             _includisHome = _appConfig.Main.Home;
         }
 
         private void SetDBUser()
         {
+            // DB-Parameter aus Konfiguration oder Command-Line-Argumenten
+            // Command-Line-Argumente haben Vorrang
             var args = Environment.GetCommandLineArgs();
+            
             for (int i = 0; i < args.Length; i++)
             {
                 var arg = args[i].ToUpper();
@@ -51,18 +57,25 @@ namespace INCLService.CSharp.Services
                     _dbServer = arg.Substring("DBSERVER=".Length).Trim();
             }
 
+            // Falls nicht gesetzt, Default-Werte verwenden
             if (string.IsNullOrEmpty(_dbUser))
                 _dbUser = _appConfig.Database.DB_User;
+            
             if (string.IsNullOrEmpty(_dbPass))
                 _dbPass = _appConfig.Database.DB_Pass;
+                
             if (string.IsNullOrEmpty(_dbServer))
                 _dbServer = _appConfig.Database.DB_Server;
+            
             if (string.IsNullOrEmpty(_dbInitialCatalog))
                 _dbInitialCatalog = _appConfig.Database.InitialCatalog;
+            
             if (string.IsNullOrEmpty(_dbProvider))
                 _dbProvider = _appConfig.Database.Provider;
 
             _dbUser = _dbUser.ToUpper();
+            
+            // INCLUDIS_HOME aus Konfiguration
             if (string.IsNullOrEmpty(_includisHome))
                 _includisHome = _appConfig.Main.Home;
         }
@@ -70,6 +83,7 @@ namespace INCLService.CSharp.Services
         private bool CheckDBConnection()
         {
             _logger.LogInformation("Check connect.");
+            
             try
             {
                 _database = new CommonDB
@@ -80,9 +94,12 @@ namespace INCLService.CSharp.Services
                     InitialCatalog = _dbInitialCatalog,
                     SqlProvider = _dbProvider
                 };
+                
                 _logger.LogInformation("Using {User}@{Server} ({Catalog}) - Provider:{Provider}",
                     _dbUser, _dbServer, _dbInitialCatalog, _dbProvider);
+                
                 _database.Connected = true;
+                
                 if (_database.Connected)
                 {
                     _logger.LogInformation("Connect Ok.");
@@ -103,6 +120,8 @@ namespace INCLService.CSharp.Services
 
         private void WriteMessage(string message, int mode = 0)
         {
+            // Log-Modus:
+            // 0 = trace, 1 = timer, 2 = shift, 3 = addons, 4 = recalc, 5 = memory, 6 = down, 7 = memdbg
             string logFile = mode switch
             {
                 0 => "svc_" + _dbUser.ToLower() + "_trace.log",
@@ -153,6 +172,7 @@ namespace INCLService.CSharp.Services
 
             try
             {
+                // Datenbankverbindung prüfen und herstellen
                 while ((_database == null || !_database.Connected) && !stoppingToken.IsCancellationRequested)
                 {
                     if (CheckDBConnection())
@@ -162,6 +182,7 @@ namespace INCLService.CSharp.Services
                             WriteMessage("Connected.", 0);
                             if (_database != null)
                                 _database.Connected = false;
+                            
                             _database = new CommonDB
                             {
                                 UserName = _dbUser,
@@ -205,10 +226,11 @@ namespace INCLService.CSharp.Services
                 WriteMessage("Database connection successfully... Start program...", 0);
 
                 // Hier würden die anderen Services gestartet werden
-                // z.B. S7Main, Th_Schicht, Th_Zusatz, etc.
-                // Für jetzt nur eine einfache Schleife
+                // In .NET Core werden die Services automatisch vom Host gestartet
+                // Wir müssen nur warten, bis der Host alle Services gestartet hat
                 while (!stoppingToken.IsCancellationRequested)
                 {
+                    // Hauptschleife - einfach warten
                     await Task.Delay(1000, stoppingToken);
                 }
             }
