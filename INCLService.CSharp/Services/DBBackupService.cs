@@ -1,3 +1,4 @@
+using INCLService.CSharp.Utilities;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Configuration;
@@ -100,6 +101,44 @@ namespace INCLService.CSharp.Services
                         _database.Connected = true;
                         _logger.LogInformation("DBBackupService database connected");
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error connecting DBBackupService database");
+                    }
+                }
+                
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    // Auf Event warten (wie WaitForSingleObject in Delphi)
+                    await ServiceEvents.WaitForEventAsync(ServiceEventSystem.EVENT_DBBACKUP, stoppingToken);
+                    
+                    if (stoppingToken.IsCancellationRequested)
+                        break;
+                    
+                    await ExecuteBackupAsync(stoppingToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DBBackupService terminated unexpectedly");
+            }
+            finally
+            {
+                // Datenbankverbindung schließen
+                if (_database != null && _database.Connected)
+                {
+                    try
+                    {
+                        _database.Connected = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error disconnecting DBBackupService database");
+                    }
+                }
+                _logger.LogInformation("DBBackupService stopped");
+            }
+        }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error connecting DBBackupService database");

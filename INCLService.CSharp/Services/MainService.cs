@@ -1,4 +1,5 @@
 using INCLService.CSharp.Models;
+using INCLService.CSharp.Utilities;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -25,7 +26,14 @@ namespace INCLService.CSharp.Services
         private string _dbProvider = string.Empty;
         private string _includisHome = string.Empty;
         private readonly object _logLock = new object();
-
+        
+        // Timer für periodische Auslösung der Events
+        private Timer _eventTriggerTimer;
+        private int _shiftTriggerInterval = 60; // Sekunden
+        private int _signalLogTriggerInterval = 30; // Sekunden
+        private int _additionalTriggerInterval = 600; // Sekunden
+        private int _dbBackupTriggerInterval = 3600; // Sekunden (1 Stunde)
+        
         public MainService(ILogger<MainService> logger, IConfiguration configuration)
         {
             _logger = logger;
@@ -38,6 +46,27 @@ namespace INCLService.CSharp.Services
             
             SetDBUser();
             _includisHome = _appConfig.Main.Home;
+            
+            // Trigger-Intervalle aus Konfiguration laden
+            LoadTriggerIntervals();
+        }
+
+        private void LoadTriggerIntervals()
+        {
+            try
+            {
+                _shiftTriggerInterval = _configuration.GetValue<int>("Triggers:ShiftInterval", 60);
+                _signalLogTriggerInterval = _configuration.GetValue<int>("Triggers:SignalLogInterval", 30);
+                _additionalTriggerInterval = _configuration.GetValue<int>("Triggers:AdditionalInterval", 600);
+                _dbBackupTriggerInterval = _configuration.GetValue<int>("Triggers:DBBackupInterval", 3600);
+                
+                _logger.LogInformation("Trigger intervals loaded - Shift: {Shift}s, SignalLog: {SignalLog}s, Additional: {Additional}s, DBBackup: {DBBackup}s",
+                    _shiftTriggerInterval, _signalLogTriggerInterval, _additionalTriggerInterval, _dbBackupTriggerInterval);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading trigger intervals");
+            }
         }
 
         private void SetDBUser()
@@ -166,6 +195,48 @@ namespace INCLService.CSharp.Services
             }
         }
 
+        /// <summary>
+        /// Startet den Timer für periodische Event-Trigger
+        /// </summary>
+        private void StartEventTriggerTimer()
+        {
+            _eventTriggerTimer = new Timer(async (state) =>
+            {
+                try
+                {
+                    // Shift-Event triggern
+                    ServiceEvents.PulseEvent(ServiceEventSystem.EVENT_SCHICHT);
+                    _logger.LogDebug("Shift event triggered");
+                    
+                    // SignalLog-Event triggern
+                    ServiceEvents.PulseEvent(ServiceEventSystem.EVENT_SIGNALLLOG);
+                    _logger.LogDebug("SignalLog event triggered");
+                    
+                    // Additional-Event triggern
+                    ServiceEvents.PulseEvent(ServiceEventSystem.EVENT_ZUSATZ);
+                    _logger.LogDebug("Additional event triggered");
+                    
+                    // DBBackup-Event triggern (seltener)
+                    ServiceEvents.PulseEvent(ServiceEventSystem.EVENT_DBBACKUP);
+                    _logger.LogDebug("DBBackup event triggered");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error triggering events");
+                }
+            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+        }
+
+        /// <summary>
+        /// Stoppt den Event-Trigger-Timer
+        /// </summary>
+        private void StopEventTriggerTimer()
+        {
+            _eventTriggerTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            _eventTriggerTimer?.Dispose();
+            _eventTriggerTimer = null;
+        }
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             WriteMessage("Service started", 0);
@@ -224,6 +295,9 @@ namespace INCLService.CSharp.Services
                     return;
 
                 WriteMessage("Database connection successfully... Start program...", 0);
+                
+                // Event-Trigger-Timer starten
+                StartEventTriggerTimer();
 
                 // Hier würden die anderen Services gestartet werden
                 // In .NET Core werden die Services automatisch vom Host gestartet
@@ -237,6 +311,10 @@ namespace INCLService.CSharp.Services
             catch (Exception ex)
             {
                 WriteMessage("Error in ServiceExecute: " + ex.Message, 0);
+            }
+            finally
+            {
+                StopEventTriggerTimer();
             }
         }
 

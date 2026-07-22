@@ -1,3 +1,4 @@
+using INCLService.CSharp.Utilities;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Configuration;
@@ -87,14 +88,25 @@ namespace INCLService.CSharp.Services
                 await LoadTimeZoneAsync(stoppingToken);
                 while (!stoppingToken.IsCancellationRequested)
                 {
-                    var now = DateTime.Now;
-                    if (_lastExecution == DateTime.MinValue || (now - _lastExecution).TotalSeconds >= _timerInterval)
+                    // Auf Event warten (wie WaitForSingleObject in Delphi)
+                    await ServiceEvents.WaitForEventAsync(ServiceEventSystem.EVENT_ZUSATZ, stoppingToken);
+                    
+                    if (stoppingToken.IsCancellationRequested)
+                        break;
+                    
+                    if (_database != null && _database.Connected)
                     {
-                        _lastExecution = now;
-                        if (_database != null && _database.Connected)
-                        {
-                            await StartProgrammeAsync(stoppingToken);
-                        }
+                        await StartProgrammeAsync(stoppingToken);
+                    }
+                }
+            }
+            catch (Exception ex) { _logger.LogError(ex, "AdditionalService error"); }
+            finally
+            {
+                if (_database != null && _database.Connected) _database.Connected = false;
+                _logger.LogInformation("AdditionalService stopped");
+            }
+        }
                     }
                     await Task.Delay(1000, stoppingToken);
                 }

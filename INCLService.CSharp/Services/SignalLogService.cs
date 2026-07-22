@@ -1,3 +1,4 @@
+using INCLService.CSharp.Utilities;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Configuration;
@@ -129,6 +130,47 @@ namespace INCLService.CSharp.Services
                         _database.Connected = true;
                         _logger.LogInformation("SignalLogService database connected");
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error connecting SignalLogService database");
+                    }
+                }
+                
+                // Signalliste initialisieren
+                await InitializeSignalListAsync(stoppingToken);
+                
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    // Auf Event warten (wie WaitForSingleObject in Delphi)
+                    await ServiceEvents.WaitForEventAsync(ServiceEventSystem.EVENT_SIGNALLLOG, stoppingToken);
+                    
+                    if (stoppingToken.IsCancellationRequested)
+                        break;
+                    
+                    await ExecuteSignalLoggingAsync(stoppingToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SignalLogService terminated unexpectedly");
+            }
+            finally
+            {
+                // Datenbankverbindung schließen
+                if (_database != null && _database.Connected)
+                {
+                    try
+                    {
+                        _database.Connected = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error disconnecting SignalLogService database");
+                    }
+                }
+                _logger.LogInformation("SignalLogService stopped");
+            }
+        }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error connecting SignalLogService database");
