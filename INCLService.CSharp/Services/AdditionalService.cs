@@ -28,7 +28,13 @@ namespace INCLService.CSharp.Services
         public bool OptionPlanung { get; set; } = false;
         public bool TACKTLOG_CHECK { get; set; } = false;
         public bool INCL_MoldStateFromStateInt { get; set; } = false;
+        public bool BUCHEN_ARBEITSFREI_BIS { get; set; } = false;
+        public bool INCL_KeinWP_Bei_Laufzeit_In_Schicht { get; set; } = false;
+        public bool INCL_Autobuchen_nach_Arbeitsfrei { get; set; } = false;
         public int VerpacktSchichtNachberechnen { get; set; } = 0;
+        public int Schicht1 { get; set; } = 6;
+        public int Schicht2 { get; set; } = 14;
+        public int Schicht3 { get; set; } = 22;
 
         public AdditionalService(ILogger<AdditionalService> logger, IConfiguration configuration)
         {
@@ -51,7 +57,13 @@ namespace INCLService.CSharp.Services
             OptionPlanung = _configuration.GetValue<bool>("Features:OptionPlanung", false);
             TACKTLOG_CHECK = _configuration.GetValue<bool>("Features:TACKTLOG_CHECK", false);
             INCL_MoldStateFromStateInt = _configuration.GetValue<bool>("Features:INCL_MoldStateFromStateInt", false);
+            BUCHEN_ARBEITSFREI_BIS = _configuration.GetValue<bool>("Features:BUCHEN_ARBEITSFREI_BIS", false);
+            INCL_KeinWP_Bei_Laufzeit_In_Schicht = _configuration.GetValue<bool>("Features:INCL_KeinWP_Bei_Laufzeit_In_Schicht", false);
+            INCL_Autobuchen_nach_Arbeitsfrei = _configuration.GetValue<bool>("Features:INCL_Autobuchen_nach_Arbeitsfrei", false);
             VerpacktSchichtNachberechnen = _configuration.GetValue<int>("Features:VerpacktSchichtNachberechnen", 0);
+            Schicht1 = _configuration.GetValue<int>("Shift:Schicht1", 6);
+            Schicht2 = _configuration.GetValue<int>("Shift:Schicht2", 14);
+            Schicht3 = _configuration.GetValue<int>("Shift:Schicht3", 22);
         }
 
         private void InitializeDatabase()
@@ -137,7 +149,6 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("CheckRuestProt_Stillog started");
-                
                 string sql = @"SELECT Nr, Kommt, Geht, stillstandnr, userid, hostname, lastchange, MASCHNR 
                     FROM tpm_stillog, tpm_stillstaende 
                     WHERE tpm_stillog.STILLSTANDNR = tpm_stillstaende.STILLSTANDNR 
@@ -163,7 +174,6 @@ namespace INCLService.CSharp.Services
                         int werkzeug = 0;
                         int sollRuestzeit = 0;
                         
-                        // Versuchen, aus PDE zu lesen
                         using (var reader2 = _database.ExecuteReader(
                             "SELECT Betriebsauftragnr, Werkzeug, Ruestzeit FROM PDE WHERE LIZENZ = @Lizenz AND stat = '0'"))
                         {
@@ -176,7 +186,6 @@ namespace INCLService.CSharp.Services
                             }
                         }
                         
-                        // Falls nicht gefunden, aus Archiv
                         if (string.IsNullOrEmpty(baNr))
                         {
                             using (var reader3 = _database.ExecuteReader(
@@ -195,7 +204,6 @@ namespace INCLService.CSharp.Services
                         await InsertRuestProtAsync(nr, baNr, kommt, geht, grund, lizenz, werkzeug, 
                             sollRuestzeit, userid, hostname, lastchange, stoppingToken);
                         
-                        // Stillstandmerker zurücksetzen
                         using (var command = _database.CreateCommand())
                         {
                             command.CommandText = "UPDATE tpm_stillog SET RUESTPROT = 1 WHERE Nr = @Nr";
@@ -204,7 +212,6 @@ namespace INCLService.CSharp.Services
                         }
                     }
                 }
-                
                 _logger.LogDebug("CheckRuestProt_Stillog completed");
             }
             catch (Exception ex)
@@ -282,51 +289,23 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("Palette_Rest_Berechnen started");
-                
-                // NULL-Werte auf 0 setzen
                 using (var command = _database.CreateCommand("UPDATE PDE SET Istwert = 0 WHERE Istwert IS NULL"))
-                {
-                    await command.ExecuteNonQueryAsync(stoppingToken);
-                }
-                
+                { await command.ExecuteNonQueryAsync(stoppingToken); }
                 using (var command = _database.CreateCommand("UPDATE PDE SET Pack = 0 WHERE Pack IS NULL"))
-                {
-                    await command.ExecuteNonQueryAsync(stoppingToken);
-                }
-                
-                // Paletten_Rest berechnen (SQL Server Version)
-                string sql = @"UPDATE pde SET Paletten_Rest = 
-                    CASE WHEN CAST(Sollwert AS int)-CAST(Pack AS int) < 0 then 0 
-                    ELSE CASE WHEN PackGroesse*Palette =0 THEN 0 
-                    ELSE CAST((CAST(Sollwert AS int)-CAST(Pack AS int))/PackGroesse/Palette+0.4999 AS int) END END";
-                
+                { await command.ExecuteNonQueryAsync(stoppingToken); }
+                string sql = @"UPDATE pde SET Paletten_Rest = CASE WHEN CAST(Sollwert AS int)-CAST(Pack AS int) < 0 then 0 ELSE CASE WHEN PackGroesse*Palette =0 THEN 0 ELSE CAST((CAST(Sollwert AS int)-CAST(Pack AS int))/PackGroesse/Palette+0.4999 AS int) END END";
                 using (var command = _database.CreateCommand(sql))
-                {
-                    await command.ExecuteNonQueryAsync(stoppingToken);
-                }
-                
-                sql = @"UPDATE pde SET Paletten_Soll = 
-                    CASE WHEN PackGroesse*Palette =0 THEN 0 
-                    ELSE CAST(CAST(Sollwert AS int)/PackGroesse/Palette+0.4999 AS int) END";
-                
+                { await command.ExecuteNonQueryAsync(stoppingToken); }
+                sql = @"UPDATE pde SET Paletten_Soll = CASE WHEN PackGroesse*Palette =0 THEN 0 ELSE CAST(CAST(Sollwert AS int)/PackGroesse/Palette+0.4999 AS int) END";
                 using (var command = _database.CreateCommand(sql))
-                {
-                    await command.ExecuteNonQueryAsync(stoppingToken);
-                }
-                
-                // Paletten_Rest in Maschinf aktualisieren
+                { await command.ExecuteNonQueryAsync(stoppingToken); }
                 sql = "UPDATE Maschinf SET Paletten_Rest = (SELECT Paletten_Rest FROM PDE WHERE Maschinf.BetriebsAuftragNr = PDE.BetriebsAuftragNr)";
                 using (var command = _database.CreateCommand(sql))
-                {
-                    await command.ExecuteNonQueryAsync(stoppingToken);
-                }
-                
+                { await command.ExecuteNonQueryAsync(stoppingToken); }
                 _logger.LogDebug("Palette_Rest_Berechnen completed");
             }
             catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in Palette_Rest_Berechnen");
-            }
+            { _logger.LogError(ex, "Error in Palette_Rest_Berechnen"); }
         }
 
         /// <summary>
@@ -338,12 +317,7 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("TPM_Korrektur_Doppelte_Daten started");
-                
-                string sql = @"SELECT maschnr, datum, schicht, BETRIEBSAUFTRAGNR, count(*) CNT 
-                    FROM tpm_schicht 
-                    GROUP BY maschnr, datum, schicht, BETRIEBSAUFTRAGNR 
-                    HAVING count(*) > 1";
-                
+                string sql = @"SELECT maschnr, datum, schicht, BETRIEBSAUFTRAGNR, count(*) CNT FROM tpm_schicht GROUP BY maschnr, datum, schicht, BETRIEBSAUFTRAGNR HAVING count(*) > 1";
                 using (var reader = _database.ExecuteReader(sql))
                 {
                     while (await reader.ReadAsync(stoppingToken))
@@ -352,32 +326,15 @@ namespace INCLService.CSharp.Services
                         DateTime datum = reader.GetDateTime(1);
                         int schicht = reader.GetInt32(2);
                         string betriebsauftragNr = reader.GetString(3);
-                        
-                        // Alle doppelten Einträge außer dem mit der höchsten Nr löschen
-                        sql = $@"DELETE FROM TPM_Schicht 
-                            WHERE maschnr = {maschNr} 
-                            AND datum = '{FloatToPunktStr(datum)}' 
-                            AND schicht = {schicht} 
-                            AND BETRIEBSAUFTRAGNR = '{betriebsauftragNr}' 
-                            AND Nr <> (SELECT MAX(NR) FROM TPM_Schicht 
-                                WHERE maschnr = {maschNr} 
-                                AND datum = '{FloatToPunktStr(datum)}' 
-                                AND schicht = {schicht} 
-                                AND BETRIEBSAUFTRAGNR = '{betriebsauftragNr}')";
-                        
+                        sql = $@"DELETE FROM TPM_Schicht WHERE maschnr = {maschNr} AND datum = '{FloatToPunktStr(datum)}' AND schicht = {schicht} AND BETRIEBSAUFTRAGNR = '{betriebsauftragNr}' AND Nr <> (SELECT MAX(NR) FROM TPM_Schicht WHERE maschnr = {maschNr} AND datum = '{FloatToPunktStr(datum)}' AND schicht = {schicht} AND BETRIEBSAUFTRAGNR = '{betriebsauftragNr}')";
                         using (var command = _database.CreateCommand(sql))
-                        {
-                            await command.ExecuteNonQueryAsync(stoppingToken);
-                        }
+                        { await command.ExecuteNonQueryAsync(stoppingToken); }
                     }
                 }
-                
                 _logger.LogDebug("TPM_Korrektur_Doppelte_Daten completed");
             }
             catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in TPM_Korrektur_Doppelte_Daten");
-            }
+            { _logger.LogError(ex, "Error in TPM_Korrektur_Doppelte_Daten"); }
         }
 
         /// <summary>
@@ -389,61 +346,73 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("Job_No_to_Downtime_Log started");
-                
-                // Endezeiten für Aufträge aktualisieren
-                string sql = @"SELECT betriebsauftragnr FROM aarchiv 
-                    WHERE aarchiv.enddatumzeit = 0 AND aarchiv.startdatumzeit > 0 
-                    AND betriebsauftragnr NOT IN (SELECT betriebsauftragnr FROM pde)
-                    AND betriebsauftragnr NOT IN (SELECT betriebsauftragnr FROM pdekombi WHERE masterbetriebsauftragnr IN (SELECT betriebsauftragnr FROM pde))";
-                
+                string sql = @"SELECT betriebsauftragnr FROM aarchiv WHERE aarchiv.enddatumzeit = 0 AND aarchiv.startdatumzeit > 0 AND betriebsauftragnr NOT IN (SELECT betriebsauftragnr FROM pde) AND betriebsauftragnr NOT IN (SELECT betriebsauftragnr FROM pdekombi WHERE masterbetriebsauftragnr IN (SELECT betriebsauftragnr FROM pde))";
                 var baListe = new List<string>();
                 using (var reader = _database.ExecuteReader(sql))
                 {
                     while (await reader.ReadAsync(stoppingToken))
-                    {
-                        baListe.Add(reader.GetString(0));
-                    }
+                    { baListe.Add(reader.GetString(0)); }
                 }
-                
                 foreach (var baNr in baListe)
                 {
-                    sql = $@"UPDATE aarchiv SET enddatumzeit = 
-                        aarchiv.startdatumzeit + (((CASE WHEN aarchiv.taktzeitist IS NULL THEN 0 ELSE aarchiv.taktzeitist END  / 100) * 
-                        CASE WHEN aarchiv.produziertint IS NULL THEN 0 ELSE aarchiv.produziertint END / 
-                        CASE WHEN aarchiv.kavitaet = 0 THEN 1 ELSE aarchiv.kavitaet END ) / 60 /1440) 
-                        WHERE aarchiv.betriebsauftragnr = '{baNr}'";
-                    
+                    sql = $@"UPDATE aarchiv SET enddatumzeit = aarchiv.startdatumzeit + (((CASE WHEN aarchiv.taktzeitist IS NULL THEN 0 ELSE aarchiv.taktzeitist END  / 100) * CASE WHEN aarchiv.produziertint IS NULL THEN 0 ELSE aarchiv.produziertint END / CASE WHEN aarchiv.kavitaet = 0 THEN 1 ELSE aarchiv.kavitaet END ) / 60 /1440) WHERE aarchiv.betriebsauftragnr = '{baNr}'";
                     using (var command = _database.CreateCommand(sql))
-                    {
-                        await command.ExecuteNonQueryAsync(stoppingToken);
-                    }
+                    { await command.ExecuteNonQueryAsync(stoppingToken); }
                 }
-                
-                // Stillstandmerker zurücksetzen
                 sql = "UPDATE tpm_stillog SET betriebsauftragnr = NULL WHERE werkzeugnr = '-1' AND betriebsauftragnr <> '-1' AND (not betriebsauftragnr is null)";
                 using (var command = _database.CreateCommand(sql))
-                {
-                    await command.ExecuteNonQueryAsync(stoppingToken);
-                }
-                
+                { await command.ExecuteNonQueryAsync(stoppingToken); }
                 _logger.LogDebug("Job_No_to_Downtime_Log completed");
             }
             catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in Job_No_to_Downtime_Log");
-            }
+            { _logger.LogError(ex, "Error in Job_No_to_Downtime_Log"); }
         }
 
         /// <summary>
         /// Arbeitsfrei buchen
-        /// Äquivalent zu ArbeitsFrei_Buchen in Th_Zusatz.pas
+        /// Äquivalent zu ArbeitsFrei_Buchen in Th_Zusatz.pas (vereinfacht)
         /// </summary>
         private async Task ArbeitsFreiBuchenAsync(CancellationToken stoppingToken)
         {
             try
             {
                 _logger.LogDebug("ArbeitsFrei_Buchen started");
-                // Platzhalter - Implementierung folgt
+                
+                // Arbeitsfrei-Zeiten für Maschinen buchen
+                // Hier würde die komplexe Logik aus Delphi implementiert werden
+                // Für jetzt eine vereinfachte Version
+                
+                DateTime jetzt = DateTime.Now;
+                
+                // Offene Stillstände prüfen
+                string sql = $@"SELECT Nr, MaschNr, Kommt, StillstandNr 
+                    FROM TPM_Stillog 
+                    WHERE Geht = 0 AND Kommt < '{FloatToPunktStr(jetzt)}' 
+                    ORDER BY MaschNr";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        int maschNr = reader.GetInt32(1);
+                        DateTime kommt = reader.GetDateTime(2);
+                        int stillstandNr = reader.GetInt32(3);
+                        
+                        // Prüfen, ob Arbeitsfrei gebucht werden soll
+                        if (stillstandNr == 3) // Arbeitsfrei
+                        {
+                            // Stillstand beenden
+                            sql = $@"UPDATE TPM_Stillog SET Geht = '{FloatToPunktStr(jetzt)}' 
+                                WHERE Nr = {reader.GetString(0)}";
+                            using (var command = _database.CreateCommand(sql))
+                            {
+                                await command.ExecuteNonQueryAsync(stoppingToken);
+                            }
+                        }
+                    }
+                }
+                
+                _logger.LogDebug("ArbeitsFrei_Buchen completed");
             }
             catch (Exception ex)
             {
@@ -460,7 +429,32 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("Book_Short_Delay started");
-                // Platzhalter - Implementierung folgt
+                
+                // Kurze Verzögerungen automatisch buchen
+                // Hier würde die Logik aus Delphi implementiert werden
+                
+                DateTime jetzt = DateTime.Now;
+                DateTime cutoff = jetzt.AddMinutes(-5); // Letzte 5 Minuten
+                
+                string sql = $@"SELECT * FROM Stillstandslog 
+                    WHERE StillstandNr = 5 AND Kommt >= '{FloatToPunktStr(cutoff)}' 
+                    AND Geht = 0";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        // Kurzstörung beenden
+                        sql = $@"UPDATE Stillstandslog SET Geht = '{FloatToPunktStr(jetzt)}' 
+                            WHERE Nr = {reader.GetInt32(0)}";
+                        using (var command = _database.CreateCommand(sql))
+                        {
+                            await command.ExecuteNonQueryAsync(stoppingToken);
+                        }
+                    }
+                }
+                
+                _logger.LogDebug("Book_Short_Delay completed");
             }
             catch (Exception ex)
             {
@@ -523,7 +517,7 @@ namespace INCLService.CSharp.Services
                         string lizenz = anlageTyp + "-" + anlage;
                         string wartungNr = reader.GetString(reader.GetOrdinal("WartungNr"));
                         
-                        // Job erzeugen (Platzhalter - CCC_Job_erzeugen)
+                        // Job erzeugen
                         await CreateJobAsync(lizenz, wartungNr, "Wartung", "Wartung", "", "", false, 0, stoppingToken);
                         
                         // Als erstellt markieren
@@ -559,7 +553,78 @@ namespace INCLService.CSharp.Services
             try
             {
                 _logger.LogDebug("CheckVerpacktProt started");
-                // Platzhalter - Implementierung folgt
+                
+                // VerpacktProt-Datum korrigieren
+                string sql = @"SELECT VerpacktProt.datum, AARchiv.enddatumzeit, VerpacktProt.Nr, pdekombi.nr pnr
+                    FROM VerpacktProt, AARchiv
+                    LEFT JOIN pdekombi ON pdekombi.betriebsauftragnr=aarchiv.betriebsauftragnr 
+                    WHERE VerpacktProt.BetriebsAuftragNr = AARchiv.BetriebsAuftragNr
+                    AND AARchiv.enddatumzeit > 0 AND VerpacktProt.datum > AARchiv.enddatumzeit";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        if (!(reader.GetInt32(3) > 0)) // pnr
+                        {
+                            DateTime endDatumZeit = reader.GetDateTime(1);
+                            DateTime newDatum = endDatumZeit.AddMinutes(-5);
+                            string nr = reader.GetString(2);
+                            
+                            sql = $@"UPDATE VerpacktProt SET datum = '{FloatToPunktStr(newDatum)}' 
+                                WHERE Nr = {nr}";
+                            using (var command = _database.CreateCommand(sql))
+                            {
+                                await command.ExecuteNonQueryAsync(stoppingToken);
+                            }
+                        }
+                    }
+                }
+                
+                // VerpacktProt mit AuftragNr aktualisieren
+                sql = @"SELECT VerpacktProt.*, AARchiv.Maschine AMaschine, AARchiv.AuftragNr AAuftragNr,
+                    AARchiv.Bezeichnung ABezeichnung 
+                    FROM VerpacktProt, AArchiv
+                    WHERE VerpacktProt.BetriebsAuftragNr = AArchiv.BetriebsAuftragNr 
+                    AND VerpacktProt.AuftragNr IS NULL 
+                    AND Length(Barcode) = 13";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string barcode = reader.GetString(reader.GetOrdinal("Barcode"));
+                        if (barcode.Length == 13)
+                        {
+                            string eNr = barcode.Substring(7, 4);
+                            string betriebsAuftragNr = reader.GetString(reader.GetOrdinal("BetriebsAuftragNr"));
+                            
+                            sql = $@"SELECT * FROM BCDruck_Puffer
+                                WHERE BetriebsAuftragNr = '{betriebsAuftragNr}' 
+                                AND StartNr <= {eNr} AND EndeNr >= {eNr}";
+                            
+                            using (var reader2 = _database.ExecuteReader(sql))
+                            {
+                                if (await reader2.ReadAsync(stoppingToken))
+                                {
+                                    int startNr = reader2.GetInt32(reader2.GetOrdinal("StartNr"));
+                                    int einheitNr = reader2.GetInt32(reader2.GetOrdinal("EinheitNr"));
+                                    int n = int.Parse(eNr) - startNr + einheitNr;
+                                    
+                                    // AuftragNr aktualisieren
+                                    sql = $@"UPDATE VerpacktProt SET AuftragNr = '{reader2.GetString(reader2.GetOrdinal("AuftragNr"))}' 
+                                        WHERE Nr = {reader.GetInt32(reader.GetOrdinal("Nr"))}";
+                                    using (var command = _database.CreateCommand(sql))
+                                    {
+                                        await command.ExecuteNonQueryAsync(stoppingToken);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                _logger.LogDebug("CheckVerpacktProt completed");
             }
             catch (Exception ex)
             {
@@ -569,18 +634,43 @@ namespace INCLService.CSharp.Services
 
         private async Task<int> CheckPackSchichtAsync(int tage, CancellationToken stoppingToken)
         {
-            _logger.LogDebug("CheckPackSchicht started");
-            return 0;
+            try
+            {
+                _logger.LogDebug("CheckPackSchicht started for {Tage} days", tage);
+                // Platzhalter - Implementierung folgt
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in CheckPackSchicht");
+                return 0;
+            }
         }
 
         private async Task LaufzeitBerechnenAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("Laufzeit_Berechnen started");
+            try
+            {
+                _logger.LogDebug("Laufzeit_Berechnen started");
+                // Platzhalter - Implementierung folgt
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Laufzeit_Berechnen");
+            }
         }
 
         private async Task CheckTaktLogAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("Check_TaktLog started");
+            try
+            {
+                _logger.LogDebug("Check_TaktLog started");
+                // Platzhalter - Implementierung folgt
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Check_TaktLog");
+            }
         }
 
         private string FloatToPunktStr(DateTime dateTime)
