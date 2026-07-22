@@ -1,4 +1,6 @@
+using INCLService.CSharp.Models;
 using INCLService.CSharp.Services;
+using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -47,8 +49,29 @@ namespace INCLService.CSharp
                             loggingBuilder.AddSerilog();
                         });
 
+                        // CommonDB Instanz erstellen und registrieren
+                        var appConfig = new AppConfig();
+                        hostContext.Configuration.GetSection("Database").Bind(appConfig.Database);
+                        hostContext.Configuration.GetSection("Main").Bind(appConfig.Main);
+                        
+                        var commonDb = new CommonDB
+                        {
+                            UserName = appConfig.Database.DB_User,
+                            Password = appConfig.Database.DB_Pass,
+                            Server = appConfig.Database.DB_Server,
+                            InitialCatalog = appConfig.Database.InitialCatalog,
+                            SqlProvider = appConfig.Database.Provider
+                        };
+                        
+                        services.AddSingleton<CommonDB>(commonDb);
+
                         // Services registrieren
                         services.AddHostedService<MainService>();
+                        services.AddHostedService<S7MainService>();
+                        services.AddHostedService<ShiftService>();
+                        services.AddHostedService<DBBackupService>();
+                        services.AddHostedService<SignalLogService>();
+                        services.AddHostedService<AdditionalService>();
                     })
                     .UseSerilog()
                     .Build();
