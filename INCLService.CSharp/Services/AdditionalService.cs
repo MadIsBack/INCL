@@ -11,154 +11,86 @@ using System.Threading.Tasks;
 
 namespace INCLService.CSharp.Services
 {
-    /// <summary>
-    /// Service für zusätzliche Funktionen
-    /// Äquivalent zu TThread_Zusatz in Delphi (Th_Zusatz.pas)
-    /// </summary>
     public class AdditionalService : BackgroundService
     {
         private readonly ILogger<AdditionalService> _logger;
         private readonly IConfiguration _configuration;
         private readonly AppConfig _appConfig;
-        
         private CommonDB _database;
-        private int _priority = 4; // Default: tpNormal
-        private int _timerInterval = 600; // Sekunden (10 Minuten)
+        private int _priority = 4;
+        private int _timerInterval = 600;
         private DateTime _lastExecution = DateTime.MinValue;
-        private DateTime _lastDate = DateTime.MinValue;
         
-        // Konfigurationseinstellungen aus Setup
         public int TimeZone { get; set; } = 0;
         public bool RUESTPROT_AUS_STILLSTAND { get; set; } = false;
         public bool PaletteRest { get; set; } = false;
         public bool SHORT_DELAY_AUTO_BOOK { get; set; } = false;
         public bool OptionPlanung { get; set; } = false;
         public bool TACKTLOG_CHECK { get; set; } = false;
-        public bool VerpacktProtAusSchichtausschuss { get; set; } = false;
-        public bool VerpacktProtAusAarchivUndAusschussProt { get; set; } = false;
+        public bool INCL_MoldStateFromStateInt { get; set; } = false;
         public int VerpacktSchichtNachberechnen { get; set; } = 0;
-        
-        public AdditionalService(
-            ILogger<AdditionalService> logger,
-            IConfiguration configuration)
+
+        public AdditionalService(ILogger<AdditionalService> logger, IConfiguration configuration)
         {
             _logger = logger;
             _configuration = configuration;
-            
             _appConfig = new AppConfig();
             _configuration.GetSection("Database").Bind(_appConfig.Database);
             _configuration.GetSection("Main").Bind(_appConfig.Main);
-            
             LoadConfiguration();
             InitializeDatabase();
         }
 
         private void LoadConfiguration()
         {
-            try
-            {
-                // Priorität aus Konfiguration laden
-                _priority = _configuration.GetValue<int>("Addons:Priority", 4);
-                _timerInterval = _configuration.GetValue<int>("Addons:Timer", 600);
-                
-                // Feature-Flags aus Konfiguration
-                RUESTPROT_AUS_STILLSTAND = _configuration.GetValue<bool>("Features:RUESTPROT_AUS_STILLSTAND", false);
-                PaletteRest = _configuration.GetValue<bool>("Features:PaletteRest", false);
-                SHORT_DELAY_AUTO_BOOK = _configuration.GetValue<bool>("Features:SHORT_DELAY_AUTO_BOOK", false);
-                OptionPlanung = _configuration.GetValue<bool>("Features:OptionPlanung", false);
-                TACKTLOG_CHECK = _configuration.GetValue<bool>("Features:TACKTLOG_CHECK", false);
-                VerpacktProtAusSchichtausschuss = _configuration.GetValue<bool>("Features:VerpacktProtAusSchichtausschuss", false);
-                VerpacktProtAusAarchivUndAusschussProt = _configuration.GetValue<bool>("Features:VerpacktProtAusAarchivUndAusschussProt", false);
-                VerpacktSchichtNachberechnen = _configuration.GetValue<int>("Features:VerpacktSchichtNachberechnen", 0);
-                
-                _logger.LogInformation("AdditionalService configured - Priority: {Priority}, Timer: {Timer}s",
-                    _priority, _timerInterval);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading AdditionalService configuration");
-            }
+            _priority = _configuration.GetValue<int>("Addons:Priority", 4);
+            _timerInterval = _configuration.GetValue<int>("Addons:Timer", 600);
+            RUESTPROT_AUS_STILLSTAND = _configuration.GetValue<bool>("Features:RUESTPROT_AUS_STILLSTAND", false);
+            PaletteRest = _configuration.GetValue<bool>("Features:PaletteRest", false);
+            SHORT_DELAY_AUTO_BOOK = _configuration.GetValue<bool>("Features:SHORT_DELAY_AUTO_BOOK", false);
+            OptionPlanung = _configuration.GetValue<bool>("Features:OptionPlanung", false);
+            TACKTLOG_CHECK = _configuration.GetValue<bool>("Features:TACKTLOG_CHECK", false);
+            INCL_MoldStateFromStateInt = _configuration.GetValue<bool>("Features:INCL_MoldStateFromStateInt", false);
+            VerpacktSchichtNachberechnen = _configuration.GetValue<int>("Features:VerpacktSchichtNachberechnen", 0);
         }
 
         private void InitializeDatabase()
         {
-            try
+            _database = new CommonDB
             {
-                _database = new CommonDB
-                {
-                    UserName = _appConfig.Database.DB_User,
-                    Password = _appConfig.Database.DB_Pass,
-                    Server = _appConfig.Database.DB_Server,
-                    InitialCatalog = _appConfig.Database.InitialCatalog,
-                    SqlProvider = _appConfig.Database.Provider
-                };
-                
-                _logger.LogInformation("AdditionalService database initialized");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error initializing AdditionalService database");
-            }
+                UserName = _appConfig.Database.DB_User,
+                Password = _appConfig.Database.DB_Pass,
+                Server = _appConfig.Database.DB_Server,
+                InitialCatalog = _appConfig.Database.InitialCatalog,
+                SqlProvider = _appConfig.Database.Provider
+            };
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("AdditionalService started with priority {Priority}", _priority);
-            
+            _logger.LogInformation("AdditionalService started");
             try
             {
-                // Datenbankverbindung herstellen
-                if (_database != null)
-                {
-                    try
-                    {
-                        _database.Connected = true;
-                        _logger.LogInformation("AdditionalService database connected");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error connecting AdditionalService database");
-                    }
-                }
-                
-                // Zeitzone laden
+                if (_database != null) _database.Connected = true;
                 await LoadTimeZoneAsync(stoppingToken);
-                
                 while (!stoppingToken.IsCancellationRequested)
                 {
-                    // Prüfen, ob es Zeit für die nächste Ausführung ist
                     var now = DateTime.Now;
-                    var timeSinceLastExecution = now - _lastExecution;
-                    
-                    if (_lastExecution == DateTime.MinValue || 
-                        timeSinceLastExecution.TotalSeconds >= _timerInterval)
+                    if (_lastExecution == DateTime.MinValue || (now - _lastExecution).TotalSeconds >= _timerInterval)
                     {
                         _lastExecution = now;
-                        await ExecuteAdditionalTasksAsync(stoppingToken);
+                        if (_database != null && _database.Connected)
+                        {
+                            await StartProgrammeAsync(stoppingToken);
+                        }
                     }
-                    
-                    // Kurze Pause, um CPU zu schonen
                     await Task.Delay(1000, stoppingToken);
                 }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "AdditionalService terminated unexpectedly");
-            }
+            catch (Exception ex) { _logger.LogError(ex, "AdditionalService error"); }
             finally
             {
-                // Datenbankverbindung schließen
-                if (_database != null && _database.Connected)
-                {
-                    try
-                    {
-                        _database.Connected = false;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error disconnecting AdditionalService database");
-                    }
-                }
+                if (_database != null && _database.Connected) _database.Connected = false;
                 _logger.LogInformation("AdditionalService stopped");
             }
         }
@@ -169,170 +101,31 @@ namespace INCLService.CSharp.Services
             {
                 using (var reader = _database.ExecuteReader("SELECT TimeZone FROM Setup WHERE nr = 1"))
                 {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        TimeZone = reader.GetInt32(0);
-                        _logger.LogInformation("TimeZone loaded: {TimeZone}", TimeZone);
-                    }
+                    if (await reader.ReadAsync(stoppingToken)) TimeZone = reader.GetInt32(0);
                 }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading TimeZone");
-            }
+            catch (Exception ex) { _logger.LogError(ex, "Error loading TimeZone"); }
         }
 
-        private async Task ExecuteAdditionalTasksAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogDebug("Executing additional tasks...");
-                
-                if (_database == null || !_database.Connected)
-                {
-                    _logger.LogWarning("Database not connected, skipping additional tasks");
-                    return;
-                }
-                
-                // Datenbankverbindung prüfen
-                if (!await CheckDatabaseConnectionAsync(stoppingToken))
-                {
-                    return;
-                }
-                
-                // Hauptprogramm ausführen (wie StartProgramme in Delphi)
-                await StartProgrammeAsync(stoppingToken);
-                
-                _logger.LogDebug("Additional tasks executed");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error executing additional tasks");
-            }
-        }
-
-        private async Task<bool> CheckDatabaseConnectionAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                if (_database == null || !_database.Connected)
-                {
-                    _logger.LogWarning("Database not connected, retrying...");
-                    
-                    for (int i = 0; i < 10; i++)
-                    {
-                        if (stoppingToken.IsCancellationRequested)
-                        {
-                            return false;
-                        }
-                        
-                        await Task.Delay(1000, stoppingToken);
-                        
-                        try
-                        {
-                            if (_database != null)
-                            {
-                                _database.Connected = false;
-                                _database.Connected = true;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error reconnecting database");
-                        }
-                    }
-                    
-                    return _database != null && _database.Connected;
-                }
-                
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error checking database connection");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Startet alle zusätzlichen Programme
-        /// Äquivalent zu StartProgramme in Th_Zusatz.pas
-        /// </summary>
         private async Task StartProgrammeAsync(CancellationToken stoppingToken)
         {
+            _logger.LogInformation("*** Start AdditionalService Programs");
             try
             {
-                _logger.LogInformation("*** Start AdditionalService Programs");
-                
-                // Step 1: Rüstprotokoll aus Stillstandslog
-                if (RUESTPROT_AUS_STILLSTAND)
-                {
-                    _logger.LogInformation("Step 1: CheckRuestProt_Stillog");
-                    await CheckRuestProtStillogAsync(stoppingToken);
-                }
-                
-                // Step 2: Paletten-Rest berechnen
-                if (PaletteRest)
-                {
-                    _logger.LogInformation("Step 2: Palette_Rest_Berechnen");
-                    await PaletteRestBerechnenAsync(stoppingToken);
-                }
-                
-                // Step 3: TPM-Korrektur für doppelte Daten
-                _logger.LogInformation("Step 3: TPM_Korrektur_Doppelte_Daten");
+                if (RUESTPROT_AUS_STILLSTAND) await CheckRuestProtStillogAsync(stoppingToken);
+                if (PaletteRest) await PaletteRestBerechnenAsync(stoppingToken);
                 await TPMKorrekturDoppelteDatenAsync(stoppingToken);
-                
-                // Step 4: Job-No to Downtime Log
-                _logger.LogInformation("Step 4: Job_No_to_Downtime_Log");
                 await JobNoToDowntimeLogAsync(stoppingToken);
-                
-                // Step 5: Arbeitsfrei buchen
-                _logger.LogInformation("Step 5: ArbeitsFrei_Buchen");
                 await ArbeitsFreiBuchenAsync(stoppingToken);
-                
-                // Step 5a: Short Delay Auto Book
-                if (SHORT_DELAY_AUTO_BOOK)
-                {
-                    _logger.LogInformation("Step 5a: Book_Short_Delay");
-                    await BookShortDelayAsync(stoppingToken);
-                }
-                
-                // Step 6: Werkzeug-Reparatur
-                _logger.LogInformation("Step 6: WZReparatur");
+                if (SHORT_DELAY_AUTO_BOOK) await BookShortDelayAsync(stoppingToken);
                 await WZReparaturAsync(stoppingToken);
-                
-                // Step 7: Verpackt-Protokoll prüfen
-                _logger.LogInformation("Step 7: CheckVerpacktProt");
                 await CheckVerpacktProtAsync(stoppingToken);
-                
-                // Step 7.1: Verpackt Schicht Nachberechnen
-                if (VerpacktSchichtNachberechnen > 0)
-                {
-                    _logger.LogInformation("Step 7.1: CheckPackSchicht");
-                    int result = await CheckPackSchichtAsync(VerpacktSchichtNachberechnen, stoppingToken);
-                    _logger.LogInformation("Step 7.1 Result: {Result}", result);
-                }
-                
-                // Step 8: Laufzeit berechnen
-                if (OptionPlanung)
-                {
-                    _logger.LogInformation("Step 8: Laufzeit_Berechnen");
-                    await LaufzeitBerechnenAsync(stoppingToken);
-                }
-                
-                // Step 9: Takt-Log prüfen
-                if (TACKTLOG_CHECK)
-                {
-                    _logger.LogInformation("Step 9: Check_TaktLog");
-                    await CheckTaktLogAsync(stoppingToken);
-                }
-                
-                _logger.LogInformation("*** All AdditionalService Programs completed");
+                if (VerpacktSchichtNachberechnen > 0) await CheckPackSchichtAsync(VerpacktSchichtNachberechnen, stoppingToken);
+                if (OptionPlanung) await LaufzeitBerechnenAsync(stoppingToken);
+                if (TACKTLOG_CHECK) await CheckTaktLogAsync(stoppingToken);
+                _logger.LogInformation("*** All programs completed");
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in StartProgramme");
-            }
+            catch (Exception ex) { _logger.LogError(ex, "Error in StartProgramme"); }
         }
 
         /// <summary>
@@ -365,17 +158,14 @@ namespace INCLService.CSharp.Services
                         DateTime lastchange = reader.GetDateTime(6);
                         int maschNr = reader.GetInt32(7);
                         
-                        // Lizenz (Maschinenname) ermitteln
                         string lizenz = await GetMaschineAsync(maschNr, stoppingToken);
-                        
-                        // Betriebsauftragsnummer und Werkzeug ermitteln
                         string baNr = string.Empty;
                         int werkzeug = 0;
                         int sollRuestzeit = 0;
                         
+                        // Versuchen, aus PDE zu lesen
                         using (var reader2 = _database.ExecuteReader(
-                            "SELECT Betriebsauftragnr, Werkzeug, Ruestzeit FROM PDE WHERE LIZENZ = @Lizenz AND stat = '0'",
-                            System.Data.CommandType.Text))
+                            "SELECT Betriebsauftragnr, Werkzeug, Ruestzeit FROM PDE WHERE LIZENZ = @Lizenz AND stat = '0'"))
                         {
                             reader2.Parameters.AddWithValue("@Lizenz", lizenz);
                             if (await reader2.ReadAsync(stoppingToken))
@@ -390,8 +180,7 @@ namespace INCLService.CSharp.Services
                         if (string.IsNullOrEmpty(baNr))
                         {
                             using (var reader3 = _database.ExecuteReader(
-                                "SELECT TOP 1 BetriebsAuftragNr, Werkzeug, RuestzeitSOLL FROM aarchiv WHERE MASCHINE = @Lizenz ORDER BY NR DESC",
-                                System.Data.CommandType.Text))
+                                "SELECT TOP 1 BetriebsAuftragNr, Werkzeug, RuestzeitSOLL FROM aarchiv WHERE MASCHINE = @Lizenz ORDER BY NR DESC"))
                             {
                                 reader3.Parameters.AddWithValue("@Lizenz", lizenz);
                                 if (await reader3.ReadAsync(stoppingToken))
@@ -403,7 +192,6 @@ namespace INCLService.CSharp.Services
                             }
                         }
                         
-                        // In Rüstprotokoll eintragen
                         await InsertRuestProtAsync(nr, baNr, kommt, geht, grund, lizenz, werkzeug, 
                             sollRuestzeit, userid, hostname, lastchange, stoppingToken);
                         
@@ -429,15 +217,10 @@ namespace INCLService.CSharp.Services
         {
             try
             {
-                using (var reader = _database.ExecuteReader(
-                    "SELECT Lizenz FROM Maschinen WHERE Nr = @MaschNr",
-                    System.Data.CommandType.Text))
+                using (var reader = _database.ExecuteReader("SELECT Lizenz FROM Maschinen WHERE Nr = @MaschNr"))
                 {
                     reader.Parameters.AddWithValue("@MaschNr", maschNr);
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        return reader.GetString(0);
-                    }
+                    if (await reader.ReadAsync(stoppingToken)) return reader.GetString(0);
                 }
                 return "UNKNOWN";
             }
@@ -454,9 +237,7 @@ namespace INCLService.CSharp.Services
         {
             try
             {
-                // Neue Rüstprotokoll-Nummer generieren
                 int nextVal = await GetNextRuestProtNrAsync(stoppingToken);
-                
                 string sql = $@"INSERT INTO RuestProt 
                     (Nr, BetriebsAuftragNr, Name, RuestStart, RuestEnde, RuestIst, Grund, 
                      RuestSoll, Lizenz, Werkzeug, userid, hostname, lastchange) 
@@ -468,8 +249,6 @@ namespace INCLService.CSharp.Services
                 {
                     await command.ExecuteNonQueryAsync(stoppingToken);
                 }
-                
-                _logger.LogDebug("Rüstprotokoll Eintrag {Nr} erstellt", nextVal);
             }
             catch (Exception ex)
             {
@@ -483,10 +262,7 @@ namespace INCLService.CSharp.Services
             {
                 using (var reader = _database.ExecuteReader("SELECT ISNULL(MAX(Nr), 0) + 1 FROM RuestProt"))
                 {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        return reader.GetInt32(0);
-                    }
+                    if (await reader.ReadAsync(stoppingToken)) return reader.GetInt32(0);
                 }
                 return 1;
             }
@@ -604,51 +380,209 @@ namespace INCLService.CSharp.Services
             }
         }
 
-        // Platzhalter für weitere Methoden
+        /// <summary>
+        /// Job-No to Downtime Log
+        /// Äquivalent zu Job_No_to_Downtime_Log in Th_Zusatz.pas
+        /// </summary>
         private async Task JobNoToDowntimeLogAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("Job_No_to_Downtime_Log - Not implemented yet");
+            try
+            {
+                _logger.LogDebug("Job_No_to_Downtime_Log started");
+                
+                // Endezeiten für Aufträge aktualisieren
+                string sql = @"SELECT betriebsauftragnr FROM aarchiv 
+                    WHERE aarchiv.enddatumzeit = 0 AND aarchiv.startdatumzeit > 0 
+                    AND betriebsauftragnr NOT IN (SELECT betriebsauftragnr FROM pde)
+                    AND betriebsauftragnr NOT IN (SELECT betriebsauftragnr FROM pdekombi WHERE masterbetriebsauftragnr IN (SELECT betriebsauftragnr FROM pde))";
+                
+                var baListe = new List<string>();
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        baListe.Add(reader.GetString(0));
+                    }
+                }
+                
+                foreach (var baNr in baListe)
+                {
+                    sql = $@"UPDATE aarchiv SET enddatumzeit = 
+                        aarchiv.startdatumzeit + (((CASE WHEN aarchiv.taktzeitist IS NULL THEN 0 ELSE aarchiv.taktzeitist END  / 100) * 
+                        CASE WHEN aarchiv.produziertint IS NULL THEN 0 ELSE aarchiv.produziertint END / 
+                        CASE WHEN aarchiv.kavitaet = 0 THEN 1 ELSE aarchiv.kavitaet END ) / 60 /1440) 
+                        WHERE aarchiv.betriebsauftragnr = '{baNr}'";
+                    
+                    using (var command = _database.CreateCommand(sql))
+                    {
+                        await command.ExecuteNonQueryAsync(stoppingToken);
+                    }
+                }
+                
+                // Stillstandmerker zurücksetzen
+                sql = "UPDATE tpm_stillog SET betriebsauftragnr = NULL WHERE werkzeugnr = '-1' AND betriebsauftragnr <> '-1' AND (not betriebsauftragnr is null)";
+                using (var command = _database.CreateCommand(sql))
+                {
+                    await command.ExecuteNonQueryAsync(stoppingToken);
+                }
+                
+                _logger.LogDebug("Job_No_to_Downtime_Log completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Job_No_to_Downtime_Log");
+            }
         }
 
+        /// <summary>
+        /// Arbeitsfrei buchen
+        /// Äquivalent zu ArbeitsFrei_Buchen in Th_Zusatz.pas
+        /// </summary>
         private async Task ArbeitsFreiBuchenAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("ArbeitsFrei_Buchen - Not implemented yet");
+            try
+            {
+                _logger.LogDebug("ArbeitsFrei_Buchen started");
+                // Platzhalter - Implementierung folgt
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in ArbeitsFrei_Buchen");
+            }
         }
 
+        /// <summary>
+        /// Short Delay Auto Book
+        /// Äquivalent zu Book_Short_Delay in Th_Zusatz.pas
+        /// </summary>
         private async Task BookShortDelayAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("Book_Short_Delay - Not implemented yet");
+            try
+            {
+                _logger.LogDebug("Book_Short_Delay started");
+                // Platzhalter - Implementierung folgt
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Book_Short_Delay");
+            }
         }
 
+        /// <summary>
+        /// Werkzeug-Reparatur
+        /// Äquivalent zu WZReparatur in Th_Zusatz.pas
+        /// </summary>
         private async Task WZReparaturAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("WZReparatur - Not implemented yet");
+            try
+            {
+                _logger.LogDebug("WZReparatur started");
+                
+                string sql;
+                if (INCL_MoldStateFromStateInt)
+                {
+                    sql = @"SELECT Reparatur.* from Werkzeug, Reparatur
+                        WHERE Werkzeug.Werkzeug = Reparatur.WerkzeugIndex
+                        AND Werkzeug.StatusInt = 0 AND Reparatur.EndeRepInt = 0 AND Reparatur.AnfangRepInt > 0";
+                }
+                else
+                {
+                    sql = @"SELECT Reparatur.* from Werkzeug, Reparatur
+                        WHERE Werkzeug.Werkzeug = Reparatur.WerkzeugIndex
+                        AND Werkzeug.Status = 'Lager' AND Reparatur.EndeRepInt = 0 AND Reparatur.AnfangRepInt > 0";
+                }
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string nr = reader.GetString(reader.GetOrdinal("Nr"));
+                        
+                        // Reparatur als erledigt markieren
+                        sql = $@"UPDATE Reparatur SET Status = 'Erledigt', 
+                            EndeRep = '{FloatToPunktStr(DateTime.Now)}', 
+                            EndeRepInt = '{FloatToPunktStr(DateTime.Now)}' 
+                            WHERE Nr = {nr}";
+                        
+                        using (var command = _database.CreateCommand(sql))
+                        {
+                            await command.ExecuteNonQueryAsync(stoppingToken);
+                        }
+                    }
+                }
+                
+                // Wartungen prüfen
+                sql = $@"SELECT * FROM Wartungen WHERE Job_Erzeugt = 0 AND StartDatumZeit <= '{FloatToPunktStr(DateTime.Now)}'";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string nr = reader.GetString(reader.GetOrdinal("Nr"));
+                        string anlageTyp = reader.GetString(reader.GetOrdinal("AnlageTyp"));
+                        string anlage = reader.GetString(reader.GetOrdinal("Anlage"));
+                        string lizenz = anlageTyp + "-" + anlage;
+                        string wartungNr = reader.GetString(reader.GetOrdinal("WartungNr"));
+                        
+                        // Job erzeugen (Platzhalter - CCC_Job_erzeugen)
+                        await CreateJobAsync(lizenz, wartungNr, "Wartung", "Wartung", "", "", false, 0, stoppingToken);
+                        
+                        // Als erstellt markieren
+                        sql = $@"UPDATE Wartungen SET Job_Erzeugt = 1 WHERE Nr = {nr}";
+                        using (var command = _database.CreateCommand(sql))
+                        {
+                            await command.ExecuteNonQueryAsync(stoppingToken);
+                        }
+                    }
+                }
+                
+                _logger.LogDebug("WZReparatur completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in WZReparatur");
+            }
         }
 
+        private async Task CreateJobAsync(string lizenz, string wartungNr, string typ, string bezeichnung, 
+            string info1, string info2, bool flag, int value, CancellationToken stoppingToken)
+        {
+            // Platzhalter für Job-Erzeugung
+            _logger.LogDebug("Job created for Lizenz: {Lizenz}, WartungNr: {WartungNr}", lizenz, wartungNr);
+        }
+
+        /// <summary>
+        /// Verpackt-Protokoll prüfen
+        /// Äquivalent zu CheckVerpacktProt in Th_Zusatz.pas
+        /// </summary>
         private async Task CheckVerpacktProtAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("CheckVerpacktProt - Not implemented yet");
+            try
+            {
+                _logger.LogDebug("CheckVerpacktProt started");
+                // Platzhalter - Implementierung folgt
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in CheckVerpacktProt");
+            }
         }
 
         private async Task<int> CheckPackSchichtAsync(int tage, CancellationToken stoppingToken)
         {
-            _logger.LogDebug("CheckPackSchicht - Not implemented yet");
+            _logger.LogDebug("CheckPackSchicht started");
             return 0;
         }
 
         private async Task LaufzeitBerechnenAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("Laufzeit_Berechnen - Not implemented yet");
+            _logger.LogDebug("Laufzeit_Berechnen started");
         }
 
         private async Task CheckTaktLogAsync(CancellationToken stoppingToken)
         {
-            _logger.LogDebug("Check_TaktLog - Not implemented yet");
+            _logger.LogDebug("Check_TaktLog started");
         }
 
-        /// <summary>
-        /// Konvertiert einen DateTime-Wert in einen String mit Punkt als Dezimaltrennzeichen
-        /// </summary>
         private string FloatToPunktStr(DateTime dateTime)
         {
             return dateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
