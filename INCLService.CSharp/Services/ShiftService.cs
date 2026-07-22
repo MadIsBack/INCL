@@ -26,9 +26,22 @@ namespace INCLService.CSharp.Services
         
         // Schicht-spezifische Variablen
         public int AlteSchicht { get; set; } = 0;
-        public bool SchichtBerechnung { get; set; } = false;
+        public bool SchichtBerechnung { get; set; } = true;
         public bool BerechnungAktiv { get; set; } = false;
         public bool RecalculateMode { get; set; } = false;
+        public int LogFileMode { get; set; } = 2; // 2 = Shift
+        
+        // Shift-Modell (1 = 2-Schicht, 2 = 3-Schicht)
+        public int ShiftModel { get; set; } = 1;
+        public int Schicht1 { get; set; } = 6; // 6:00 Uhr
+        public int Schicht2 { get; set; } = 14; // 14:00 Uhr
+        public int Schicht3 { get; set; } = 22; // 22:00 Uhr
+        
+        // TPM-Instanz
+        private TPM _thTPM;
+        
+        // Stillstandsliste
+        private StillstandEintragsListe _stillstandListe = new StillstandEintragsListe();
         
         public ShiftService(
             ILogger<ShiftService> logger,
@@ -43,6 +56,7 @@ namespace INCLService.CSharp.Services
             
             LoadConfiguration();
             InitializeDatabase();
+            InitializeTPM();
         }
 
         private void LoadConfiguration()
@@ -53,8 +67,14 @@ namespace INCLService.CSharp.Services
                 _priority = _configuration.GetValue<int>("Shift:Priority", 3);
                 _timerInterval = _configuration.GetValue<int>("Shift:Timer", 60);
                 
-                _logger.LogInformation("ShiftService configured - Priority: {Priority}, Timer: {Timer}s",
-                    _priority, _timerInterval);
+                // Shift-Modell und Schichtzeiten
+                ShiftModel = _configuration.GetValue<int>("Shift:ShiftModel", 1);
+                Schicht1 = _configuration.GetValue<int>("Shift:Schicht1", 6);
+                Schicht2 = _configuration.GetValue<int>("Shift:Schicht2", 14);
+                Schicht3 = _configuration.GetValue<int>("Shift:Schicht3", 22);
+                
+                _logger.LogInformation("ShiftService configured - Priority: {Priority}, Timer: {Timer}s, ShiftModel: {Model}",
+                    _priority, _timerInterval, ShiftModel);
             }
             catch (Exception ex)
             {
@@ -80,6 +100,24 @@ namespace INCLService.CSharp.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error initializing ShiftService database");
+            }
+        }
+
+        private void InitializeTPM()
+        {
+            try
+            {
+                _thTPM = new TPM(_database);
+                _thTPM.ShiftModel = ShiftModel;
+                _thTPM.Schicht1 = Schicht1;
+                _thTPM.Schicht2 = Schicht2;
+                _thTPM.Schicht3 = Schicht3;
+                
+                _logger.LogInformation("ShiftService TPM initialized");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initializing ShiftService TPM");
             }
         }
 
@@ -146,7 +184,13 @@ namespace INCLService.CSharp.Services
         {
             try
             {
-                _logger.LogDebug("Executing shift logic...");
+                _logger.LogInformation("[{LogFileMode}] Wait for Single Object...", LogFileMode);
+                
+                // Hier würde auf ein Event gewartet werden (in Delphi: WaitForSingleObject)
+                // In C# verwenden wir eine Verzögerung als Platzhalter
+                await Task.Delay(1000, stoppingToken);
+                
+                _logger.LogInformation("[{LogFileMode}] Single Object triggered", LogFileMode);
                 
                 if (_database == null || !_database.Connected)
                 {
@@ -154,50 +198,121 @@ namespace INCLService.CSharp.Services
                     return;
                 }
                 
-                // Hier würde die Schichtwechsel-Logik implementiert werden
-                // Äquivalent zu TThread_Schicht.Execute in Delphi
-                
-                // Beispiel: Prüfen, ob Schichtwechsel nötig ist
-                if (await CheckSchichtwechselAsync(stoppingToken))
+                // Datenbankverbindung prüfen
+                if (!await CheckDatabaseConnectionAsync(stoppingToken))
                 {
-                    _logger.LogInformation("Schichtwechsel erkannt, starte Berechnungen...");
-                    await StartSchichtWechselAsync(AlteSchicht, stoppingToken);
+                    return;
                 }
                 
-                // Weitere Schicht-Berechnungen
-                if (SchichtBerechnung)
+                _logger.LogInformation("[{LogFileMode}] Database seems active", LogFileMode);
+                
+                BerechnungAktiv = true;
+                
+                try
                 {
-                    await BerechneSchichtDatenAsync(stoppingToken);
+                    if (stoppingToken.IsCancellationRequested)
+                    {
+                        _logger.LogInformation("[{LogFileMode}] Shift Calc Terminated - 1", LogFileMode);
+                        return;
+                    }
+                    
+                    if (RecalculateMode)
+                    {
+                        LogFileMode = 4; // Recalc
+                        _logger.LogInformation("[{LogFileMode}] Start Recalc", LogFileMode);
+                        await RecalculationAsync(stoppingToken);
+                        _logger.LogInformation("[{LogFileMode}] End Recalc", LogFileMode);
+                    }
+                    else
+                    {
+                        LogFileMode = 2; // Shift
+                        _logger.LogInformation("[{LogFileMode}] Start Shift Change", LogFileMode);
+                        await StartSchichtWechselAsync(AlteSchicht, stoppingToken);
+                        _logger.LogInformation("[{LogFileMode}] End Shift Change", LogFileMode);
+                    }
+                }
+                finally
+                {
+                    BerechnungAktiv = false;
                 }
                 
-                _logger.LogDebug("Shift logic executed");
+                _logger.LogInformation("[{LogFileMode}] End of Block", LogFileMode);
+                _logger.LogInformation("[{LogFileMode}] ----------------------------------------------------", LogFileMode);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error executing shift logic");
+                _logger.LogError(ex, "[{LogFileMode}] Exception in Shift.Execute", LogFileMode);
             }
         }
 
-        private async Task<bool> CheckSchichtwechselAsync(CancellationToken stoppingToken)
+        private async Task<bool> CheckDatabaseConnectionAsync(CancellationToken stoppingToken)
         {
-            // Hier würde geprüft werden, ob ein Schichtwechsel nötig ist
-            // Äquivalent zu Schichtwechsel-Funktion in Delphi
             try
             {
-                using (var reader = _database.ExecuteReader(
-                    "SELECT TOP 1 * FROM Schichtwechsel WHERE Berechnet = 0 ORDER BY Datum"))
+                // Datenbankverbindung prüfen
+                if (_database == null || !_database.Connected)
                 {
-                    if (await reader.ReadAsync(stoppingToken))
+                    _logger.LogWarning("[{LogFileMode}] Database not connected, retrying...", LogFileMode);
+                    
+                    // 30 Sekunden warten und mehrmals versuchen
+                    for (int i = 0; i < 10; i++)
                     {
-                        return true;
+                        if (stoppingToken.IsCancellationRequested)
+                        {
+                            _logger.LogInformation("[{LogFileMode}] Shift Calc Terminated - 2", LogFileMode);
+                            return false;
+                        }
+                        
+                        await Task.Delay(1000, stoppingToken);
+                        
+                        try
+                        {
+                            if (_database != null)
+                            {
+                                _database.Connected = false;
+                                _database.Connected = true;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "[{LogFileMode}] Error reconnecting database", LogFileMode);
+                        }
                     }
+                    
+                    return _database != null && _database.Connected;
                 }
-                return false;
+                
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking Schichtwechsel");
+                _logger.LogError(ex, "[{LogFileMode}] Error checking database connection", LogFileMode);
                 return false;
+            }
+        }
+
+        private async Task RecalculationAsync(CancellationToken stoppingToken)
+        {
+            // Hier würde die Neuberechnung durchgeführt werden
+            // Äquivalent zu Recalculation in Delphi
+            try
+            {
+                _logger.LogInformation("Recalculation started");
+                
+                // TPM-Daten neu berechnen
+                if (_thTPM != null)
+                {
+                    _thTPM.Calculate(true); // Mit Korrektur
+                }
+                
+                // Stillstandsberechnungen
+                await BerechneStillstaendeAsync(stoppingToken);
+                
+                _logger.LogInformation("Recalculation completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Recalculation");
             }
         }
 
@@ -207,72 +322,181 @@ namespace INCLService.CSharp.Services
             // Äquivalent zu StartSchichtWechsel in Delphi
             try
             {
-                BerechnungAktiv = true;
-                AlteSchicht = alteSchicht;
-                
-                // Schichtwechsel-Logik implementieren
                 _logger.LogInformation("Schichtwechsel von Schicht {AlteSchicht} gestartet", alteSchicht);
                 
-                // Beispiel: TPM-Daten für neue Schicht berechnen
-                await BerechneTPMSchichtAsync(stoppingToken);
+                // TPM-Daten für neue Schicht berechnen
+                if (_thTPM != null)
+                {
+                    _thTPM.Schicht = alteSchicht;
+                    _thTPM.Calculate(false); // Ohne Korrektur
+                }
                 
-                BerechnungAktiv = false;
+                // Stillstandsberechnungen für die neue Schicht
+                await BerechneStillstaendeAsync(stoppingToken);
+                
+                // Schichtwechsel in der Datenbank speichern
+                await SaveSchichtwechselAsync(alteSchicht, stoppingToken);
+                
+                _logger.LogInformation("Schichtwechsel abgeschlossen");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in StartSchichtWechsel");
-                BerechnungAktiv = false;
             }
         }
 
-        private async Task BerechneTPMSchichtAsync(CancellationToken stoppingToken)
+        private async Task BerechneStillstaendeAsync(CancellationToken stoppingToken)
         {
-            // Hier würden die TPM-Daten für die Schicht berechnet werden
-            // Äquivalent zu TPM_Schicht_Pruefen, Berechne_Stillstaende_Schicht, etc.
+            // Hier würden die Stillstände berechnet werden
             try
             {
-                _logger.LogDebug("Berechne TPM Schicht Daten...");
+                _logger.LogDebug("Berechne Stillstände...");
                 
-                // Beispiel: Stillstandszeiten berechnen
+                // Stillstandsdaten aus der Datenbank laden
                 using (var reader = _database.ExecuteReader(
-                    "SELECT MaschinenNr, StillstandNr, StartZeit, EndeZeit FROM Stillstandslog WHERE Schicht = 1"))
+                    "SELECT Nr, Kommt, Geht, GrundNr, Geplant, Maschnr, Gruppe, Stillstand FROM Stillstandslog WHERE Berechnet = 0"))
                 {
                     while (await reader.ReadAsync(stoppingToken))
                     {
-                        // Stillstandszeiten verarbeiten
-                        var maschinenNr = reader.GetInt32(0);
-                        var stillstandNr = reader.GetInt32(1);
-                        var startZeit = reader.GetDateTime(2);
-                        var endeZeit = reader.GetDateTime(3);
+                        var eintrag = new StillstandEintrag
+                        {
+                            Nr = reader.GetInt32(0),
+                            Kommt = reader.GetDateTime(1),
+                            Geht = reader.GetDateTime(2),
+                            GrundNr = reader.GetInt32(3),
+                            Geplant = reader.GetBoolean(4),
+                            Maschnr = reader.GetInt32(5),
+                            Gruppe = reader.GetInt32(6),
+                            Stillstand = reader.GetString(7)
+                        };
                         
-                        _logger.LogDebug("Stillstand Maschine {Maschine}, Nr {Nr}: {Start} - {Ende}",
-                            maschinenNr, stillstandNr, startZeit, endeZeit);
+                        _stillstandListe.Add(eintrag);
                     }
                 }
+                
+                // Stillstandszeiten berechnen
+                foreach (var maschNr in GetUniqueMaschinenNummern())
+                {
+                    var dauer = _stillstandListe.GetDauerByMaschNr(maschNr);
+                    _logger.LogDebug("Maschine {MaschNr}: Stillstandsdauer = {Dauer} Minuten", maschNr, dauer);
+                }
+                
+                _logger.LogDebug("Stillstände berechnet");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error berechnend TPM Schicht");
+                _logger.LogError(ex, "Error berechnend Stillstände");
             }
         }
 
-        private async Task BerechneSchichtDatenAsync(CancellationToken stoppingToken)
+        private List<int> GetUniqueMaschinenNummern()
         {
-            // Hier würden die Schichtdaten berechnet werden
-            // Äquivalent zu Berechne_A_Daten, TPM_Korrektur, etc.
+            var maschinenNummern = new List<int>();
+            foreach (var eintrag in _stillstandListe)
+            {
+                if (!maschinenNummern.Contains(eintrag.Maschnr))
+                {
+                    maschinenNummern.Add(eintrag.Maschnr);
+                }
+            }
+            return maschinenNummern;
+        }
+
+        private async Task SaveSchichtwechselAsync(int alteSchicht, CancellationToken stoppingToken)
+        {
+            // Hier würde der Schichtwechsel in der Datenbank gespeichert werden
             try
             {
-                _logger.LogDebug("Berechne Schicht Daten...");
+                _logger.LogDebug("Speichere Schichtwechsel...");
                 
-                // Beispiel: Produktionsdaten der Schicht berechnen
-                // using (var reader = _database.ExecuteReader("SELECT ... FROM Produktionsdaten"))
-                // {
-                //     ...
-                // }
+                // Beispiel: Schichtwechsel in der Datenbank markieren
+                using (var command = _database.CreateCommand())
+                {
+                    command.CommandText = "UPDATE Schichtwechsel SET Berechnet = 1 WHERE Schicht = @Schicht";
+                    command.Parameters.AddWithValue("@Schicht", alteSchicht);
+                    await command.ExecuteNonQueryAsync(stoppingToken);
+                }
+                
+                _logger.LogDebug("Schichtwechsel gespeichert");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error berechnend Schicht Daten");
+                _logger.LogError(ex, "Error speichernd Schichtwechsel");
+            }
+        }
+
+        /// <summary>
+        /// Prüft, ob ein Schichtwechsel nötig ist
+        /// Äquivalent zu Schichtwechsel in Delphi
+        /// </summary>
+        public bool CheckSchichtwechsel()
+        {
+            try
+            {
+                // Prüfen, ob ein Schichtwechsel-Signal vorliegt
+                int signalNr = GetSignalNr(TPM.CSTILLNRARBEITSFREI); // Beispiel-Signal
+                
+                if (signalNr == -1)
+                {
+                    return false;
+                }
+                
+                // Prüfen, ob manuelle Buchung aktiviert ist
+                bool manuell = false;
+                using (var reader = _database.ExecuteReader("SELECT manuelle_Buchung FROM setup WHERE nr = 1"))
+                {
+                    if (reader.Read())
+                    {
+                        manuell = reader.GetInt32(0) == 1;
+                    }
+                }
+                
+                // Prüfen, ob Datensatz schon erzeugt wurde
+                if (!manuell)
+                {
+                    using (var reader = _database.ExecuteReader(
+                        "SELECT COUNT(*) FROM SIGNAL_SCHREIBEN WHERE SignalNr = @SignalNr",
+                        System.Data.CommandType.Text))
+                    {
+                        if (reader.Read() && reader.GetInt32(0) > 0)
+                        {
+                            return false; // Schon erzeugt
+                        }
+                    }
+                }
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking Schichtwechsel");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Gibt die Signal-Nummer für eine bestimmte Signal-Art zurück
+        /// Äquivalent zu GetSignalNr in Delphi
+        /// </summary>
+        private int GetSignalNr(int signalArt)
+        {
+            try
+            {
+                using (var reader = _database.ExecuteReader(
+                    "SELECT SignalNr FROM SIGNALE WHERE SignalArt = @SignalArt",
+                    System.Data.CommandType.Text))
+                {
+                    if (reader.Read())
+                    {
+                        return reader.GetInt32(0);
+                    }
+                }
+                return -1;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetSignalNr");
+                return -1;
             }
         }
 
