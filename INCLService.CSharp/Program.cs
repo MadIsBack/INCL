@@ -1,5 +1,6 @@
 using INCLService.CSharp.Models;
 using INCLService.CSharp.Services;
+using INCLService.CSharp.Utilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -48,6 +49,10 @@ namespace INCLService.CSharp
                             loggingBuilder.AddSerilog();
                         });
 
+                        // ServiceEventSystem als Singleton registrieren
+                        // Dies ermöglicht die Kommunikation zwischen den Services
+                        services.AddSingleton<ServiceEventSystem>();
+
                         // Services registrieren
                         // Jeder Service erstellt seine eigene CommonDB-Instanz
                         services.AddHostedService<MainService>();
@@ -56,6 +61,9 @@ namespace INCLService.CSharp
                         services.AddHostedService<DBBackupService>();
                         services.AddHostedService<SignalLogService>();
                         services.AddHostedService<AdditionalService>();
+                        
+                        // DatenService als Singleton registrieren (wird von mehreren Services genutzt)
+                        services.AddSingleton<DatenService>();
                     })
                     .UseSerilog()
                     .Build();

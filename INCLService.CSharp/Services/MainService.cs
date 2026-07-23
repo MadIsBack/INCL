@@ -11,11 +11,16 @@ using System.Threading.Tasks;
 
 namespace INCLService.CSharp.Services
 {
+    /// <summary>
+    /// Haupt-Service - Äquivalent zu TINCLServ in Delphi (Main.pas)
+    /// Schritt 18: ServiceEventSystem Integration und Event-Trigger
+    /// </summary>
     public class MainService : BackgroundService
     {
         private readonly ILogger<MainService> _logger;
         private readonly IConfiguration _configuration;
         private readonly AppConfig _appConfig;
+        private readonly ServiceEventSystem _serviceEvents;
         private CommonDB _database;
         private bool _lastDBConnectStatus = true;
         private bool _s7MainOK = true;
@@ -34,15 +39,20 @@ namespace INCLService.CSharp.Services
         private int _additionalTriggerInterval = 600; // Sekunden
         private int _dbBackupTriggerInterval = 3600; // Sekunden (1 Stunde)
         
-        public MainService(ILogger<MainService> logger, IConfiguration configuration)
+        // Zeitstempel für letzte Event-Trigger
+        private DateTime _lastShiftTrigger = DateTime.MinValue;
+        private DateTime _lastSignalLogTrigger = DateTime.MinValue;
+        private DateTime _lastAdditionalTrigger = DateTime.MinValue;
+        private DateTime _lastDBBackupTrigger = DateTime.MinValue;
+        
+        public MainService(ILogger<MainService> logger, IConfiguration configuration, ServiceEventSystem serviceEvents = null)
         {
             _logger = logger;
             _configuration = configuration;
-            
-            // Konfiguration laden
             _appConfig = new AppConfig();
             _configuration.GetSection("Database").Bind(_appConfig.Database);
             _configuration.GetSection("Main").Bind(_appConfig.Main);
+            _serviceEvents = serviceEvents ?? ServiceEvents.Instance;
             
             SetDBUser();
             _includisHome = _appConfig.Main.Home;
@@ -197,6 +207,7 @@ namespace INCLService.CSharp.Services
 
         /// <summary>
         /// Startet den Timer für periodische Event-Trigger
+        /// Schritt 18: Event-Trigger mit individuellen Intervallen
         /// </summary>
         private void StartEventTriggerTimer()
         {
@@ -204,21 +215,37 @@ namespace INCLService.CSharp.Services
             {
                 try
                 {
-                    // Shift-Event triggern
-                    ServiceEvents.PulseEvent(ServiceEventSystem.EVENT_SCHICHT);
-                    _logger.LogDebug("Shift event triggered");
+                    // Shift-Event triggern (alle _shiftTriggerInterval Sekunden)
+                    if ((DateTime.Now - _lastShiftTrigger).TotalSeconds >= _shiftTriggerInterval)
+                    {
+                        _serviceEvents.PulseEvent(ServiceEventSystem.EVENT_SCHICHT);
+                        _lastShiftTrigger = DateTime.Now;
+                        _logger.LogDebug("Shift event triggered");
+                    }
                     
-                    // SignalLog-Event triggern
-                    ServiceEvents.PulseEvent(ServiceEventSystem.EVENT_SIGNALLLOG);
-                    _logger.LogDebug("SignalLog event triggered");
+                    // SignalLog-Event triggern (alle _signalLogTriggerInterval Sekunden)
+                    if ((DateTime.Now - _lastSignalLogTrigger).TotalSeconds >= _signalLogTriggerInterval)
+                    {
+                        _serviceEvents.PulseEvent(ServiceEventSystem.EVENT_SIGNALLLOG);
+                        _lastSignalLogTrigger = DateTime.Now;
+                        _logger.LogDebug("SignalLog event triggered");
+                    }
                     
-                    // Additional-Event triggern
-                    ServiceEvents.PulseEvent(ServiceEventSystem.EVENT_ZUSATZ);
-                    _logger.LogDebug("Additional event triggered");
+                    // Additional-Event triggern (alle _additionalTriggerInterval Sekunden)
+                    if ((DateTime.Now - _lastAdditionalTrigger).TotalSeconds >= _additionalTriggerInterval)
+                    {
+                        _serviceEvents.PulseEvent(ServiceEventSystem.EVENT_ZUSATZ);
+                        _lastAdditionalTrigger = DateTime.Now;
+                        _logger.LogDebug("Additional event triggered");
+                    }
                     
-                    // DBBackup-Event triggern (seltener)
-                    ServiceEvents.PulseEvent(ServiceEventSystem.EVENT_DBBACKUP);
-                    _logger.LogDebug("DBBackup event triggered");
+                    // DBBackup-Event triggern (alle _dbBackupTriggerInterval Sekunden)
+                    if ((DateTime.Now - _lastDBBackupTrigger).TotalSeconds >= _dbBackupTriggerInterval)
+                    {
+                        _serviceEvents.PulseEvent(ServiceEventSystem.EVENT_DBBACKUP);
+                        _lastDBBackupTrigger = DateTime.Now;
+                        _logger.LogDebug("DBBackup event triggered");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -235,6 +262,22 @@ namespace INCLService.CSharp.Services
             _eventTriggerTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             _eventTriggerTimer?.Dispose();
             _eventTriggerTimer = null;
+        }
+
+        /// <summary>
+        /// Setzt das Event für einen bestimmten Service
+        /// </summary>
+        public void SetEvent(string eventName)
+        {
+            _serviceEvents.SetEvent(eventName);
+        }
+        
+        /// <summary>
+        /// Pulses das Event für einen bestimmten Service
+        /// </summary>
+        public void PulseEvent(string eventName)
+        {
+            _serviceEvents.PulseEvent(eventName);
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
