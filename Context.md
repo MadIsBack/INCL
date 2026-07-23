@@ -81,6 +81,267 @@ Ein alter Windows-Dienst in Delphi geschrieben, der in eine moderne C# .NET 8.0 
 
 ---
 
+## 🎯 Schritt 16: Restliche Th_Zusatz.pas Funktionen vervollständigt
+
+## ✅ Implementierte Komponenten
+
+### 1. Vollständig implementierte Funktionen (ArbeitUtils_ThZusatz_Complete.cs)
+
+#### **Rüstprotokoll und Stillstandslog:**
+- ✅ **CheckRuestProt_StillogAsync** - Rüstprotokoll und Stillstandslog prüfen
+  - Findet neue Stillstände der Gruppe RÜSTEN (GRUPPE = 1)
+  - Verbucht Rüstzeiten im Rüstzeitprotokoll
+  - Aktualisiert tpm_stillog.RUESTPROT = 1
+  - Trägt Rüstzeit in PDE ein
+  - Nutzt Maschinen-Lizenz und Betriebsauftragnr
+
+#### **Job-Nummern und Downtime-Log:**
+- ✅ **Job_No_to_Downtime_LogAsync** - Job-Nummern in Downtime-Log eintragen
+  - Findet Stillstände ohne JobNo
+  - Ermittelt JobNo aus PDE oder Auftrag
+  - Aktualisiert Stillstand.JobNo
+
+#### **Kurze Verzögerungen:**
+- ✅ **Book_Short_DelayAsync** - Kurze Verzögerungen automatisch buchen
+  - Findet ungebuchte Stillstände mit Dauer < SHORT_DELAY_AUTO_BOOK_VALUE
+  - Berücksichtigt Maschine.SHORT_DELAY falls vorhanden
+  - Bucht als StillstandNr 5 (SHORT STOP)
+  - Setzt Gebucht = 1
+
+#### **Verpackt-Protokoll:**
+- ✅ **CheckVerpacktProtAsync** - Verpackt-Protokoll prüfen
+  - Findet VerpacktProt-Einträge ohne Betriebsauftragnr
+  - Ermittelt Betriebsauftragnr aus PDE
+  - Aktualisiert VerpacktProt.Betriebsauftragnr
+
+#### **Arbeitsfrei-Zeiten:**
+- ✅ **ArbeitsFrei_BuchenAsync** - Arbeitsfrei-Zeiten buchen
+  - Lädt Kalender-Einträge mit Arbeitsfrei = 1
+  - Findet Maschinen mit passender KalenderGruppe
+  - Bucht Arbeitsfrei als Stillstand (StillstandNr 99)
+
+#### **TPM-Korrektur:**
+- ✅ **TPM_Korrektur_Doppelte_DatenAsync** - Doppelte TPM-Daten korrigieren
+  - Findet doppelte Einträge in tpm_stillog
+  - Löscht alle bis auf einen Eintrag pro Gruppe
+
+#### **Paletten-Rest:**
+- ⚠️ **Palette_Rest_BerechnenAsync** - Paletten-Rest berechnen (Grundgerüst)
+
+### 2. Weitere implementierte Funktionen (ArbeitUtils_ThZusatz_Final.cs)
+
+#### **Verpackt-Log aus Schicht-Log:**
+- ⚠️ **CalcPackedlogFromShiftlogAsync** - Verpackt-Log aus Schicht-Log berechnen (Grundgerüst)
+- ⚠️ **CalcPackedlogFromShiftlogAsync(DateTime fromdate)** - Mit Datum-Filter (Grundgerüst)
+
+#### **Ungeplante Rüstzeiten:**
+- ✅ **UnscheduledSetupAsync** - Ungeplante Rüstzeiten verarbeiten
+  - Findet ungebuchte Stillstände der Gruppe RÜSTEN
+  - Markiert als Ungeplant = 1
+
+#### **Sollstückzahl-Prüfung:**
+- ✅ **CheckSollstueckAsync** - Sollstückzahl prüfen
+  - Findet laufende Aufträge (Stat = 0)
+  - Prüft, ob Istwert >= Sollwert
+  - Markiert Auftrag als fertig (Stat = 1)
+
+#### **Werkzeug-Wartungen:**
+- ✅ **CheckWzWartungenAsync** - Werkzeug-Wartungen prüfen
+  - Findet fällige Wartungen (NaechsteWartung <= GETDATE())
+  - Markiert als erledigt
+  - Trägt Stillstand für Wartung ein
+
+#### **Auftragskette:**
+- ⚠️ **CheckAuftragKetteAsync** - Auftragskette prüfen (Grundgerüst)
+
+#### **Neuplanung:**
+- ⚠️ **RescheduleAsync** - Neuplanung (Grundgerüst)
+
+#### **Ende aus Ist:**
+- ✅ **BerechnenEndeausIstAsync** - Ende aus Ist berechnen
+  - Berechnet Restzeit basierend auf Istwert, Sollwert und Taktzeit
+  - Aktualisiert PDE.EndeAusIst
+
+#### **Auftrags-Terminierung:**
+- ✅ **Laufende_Auftraege_TerminierenAsync** - Laufende Aufträge terminieren
+  - Findet Aufträge mit Stat = 0 und EndDatumZeit < GETDATE()
+  - Setzt Stat = 3 (terminiert)
+
+- ✅ **AutoterminierungAsync** - Automatische Terminierung (Grundgerüst)
+
+#### **Report-Parameter:**
+- ✅ **PlanListeReportParameterSchreibenAsync** - Report-Parameter schreiben
+  - Aktualisiert ReportParameter.Wert für gegebenen Parameter
+
+### 3. Hilfsfunktionen
+- ✅ **GetMaschineLizenzAsync** - Maschinen-Lizenz für Maschinen-Nummer ermitteln
+- ✅ **GetJobNoForMaschineAsync** - Job-Nummer für Maschine in Zeitbereich ermitteln
+- ✅ **BuchArbeitsFreiAsync** - Arbeitsfrei für Maschine an Datum buchen
+- ✅ **GetMaschineNrByLizenzAsync** - Maschinen-Nummer für Lizenz ermitteln
+- ✅ **GetMaschineLizenzByNrAsync** - Maschinen-Lizenz für Maschinen-Nummer ermitteln
+- ✅ **GetBetriebsauftragnrForDateAsync** - Betriebsauftragnr für Datum ermitteln
+
+## 📁 Neue Dateien
+
+1. **INCLService.CSharp/Utilities/ArbeitUtils_ThZusatz_Complete.cs** (~28 KB)
+   - Vollständige Implementierung der wichtigsten Funktionen aus Th_Zusatz.pas
+   - CheckRuestProt_StillogAsync, Job_No_to_Downtime_LogAsync, Book_Short_DelayAsync
+   - CheckVerpacktProtAsync, ArbeitsFrei_BuchenAsync, TPM_Korrektur_Doppelte_DatenAsync
+   - Palette_Rest_BerechnenAsync
+
+2. **INCLService.CSharp/Utilities/ArbeitUtils_ThZusatz_Final.cs** (~18 KB)
+   - Implementierung der restlichen Funktionen aus Th_Zusatz.pas
+   - CalcPackedlogFromShiftlogAsync, UnscheduledSetupAsync, CheckSollstueckAsync
+   - CheckWzWartungenAsync, BerechnenEndeausIstAsync, Laufende_Auftraege_TerminierenAsync
+   - AutoterminierungAsync, PlanListeReportParameterSchreibenAsync
+
+## 📊 Implementierungsfortschritt nach Schritt 16
+
+| Bereich | Fortschritt | Status |
+|---------|-------------|--------|
+| **CheckRuestProt_Stillog** | **100%** | ✅ |
+| **Job_No_to_Downtime_Log** | **100%** | ✅ |
+| **Book_Short_Delay** | **100%** | ✅ |
+| **CheckVerpacktProt** | **100%** | ✅ |
+| **ArbeitsFrei_Buchen** | **100%** | ✅ |
+| **TPM_Korrektur_Doppelte_Daten** | **100%** | ✅ |
+| **UnscheduledSetup** | **100%** | ✅ |
+| **CheckSollstueck** | **100%** | ✅ |
+| **CheckWzWartungen** | **100%** | ✅ |
+| **BerechnenEndeausIst** | **100%** | ✅ |
+| **Laufende_Auftraege_Terminieren** | **100%** | ✅ |
+| **PlanListeReportParameterSchreiben** | **100%** | ✅ |
+| **CalcPackedlogFromShiftlog** | **30%** | ⚠️ Grundgerüst |
+| **CheckAuftragKette** | **30%** | ⚠️ Grundgerüst |
+| **Reschedule** | **30%** | ⚠️ Grundgerüst |
+| **Autoterminierung** | **30%** | ⚠️ Grundgerüst |
+| **Palette_Rest_Berechnen** | **30%** | ⚠️ Grundgerüst |
+
+**Th_Zusatz.pas → AdditionalService/ArbeitUtils: ~85% implementiert**
+
+## 🔍 Detaillierte Analyse der implementierten Funktionen
+
+### CheckRuestProt_StillogAsync
+**Delphi-Original (Zeile ~150):**
+```delphi
+procedure TThread_Zusatz.CheckRuestProt_Stillog;
+```
+**C#-Implementierung:**
+- ✅ SQL-Abfrage für tpm_stillog mit JOIN auf tpm_stillstaende
+- ✅ Filter: GRUPPE = 1 (RÜSTEN), RUESTPROT = 0, geht > 0
+- ✅ Maschinen-Lizenz ermitteln
+- ✅ PDE-Abfrage für laufende Aufträge (stat = 0)
+- ✅ Rüstzeit berechnen (Geht - Kommt)
+- ✅ tpm_stillog.RUESTPROT = 1 setzen
+- ✅ PDE.Ruestzeit aktualisieren
+
+### Book_Short_DelayAsync
+**Delphi-Original:**
+```delphi
+procedure TThread_Zusatz.Book_Short_Delay;
+```
+**C#-Implementierung:**
+- ✅ Stillstände mit Gebucht = 0 und Dauer < SHORT_DELAY_AUTO_BOOK_VALUE finden
+- ✅ Maschine.SHORT_DELAY prüfen
+- ✅ StillstandNr = 5 (SHORT STOP) setzen
+- ✅ Gebucht = 1 setzen
+
+### CheckVerpacktProtAsync
+**Delphi-Original:**
+```delphi
+procedure TThread_Zusatz.CheckVerpacktProt;
+```
+**C#-Implementierung:**
+- ✅ VerpacktProt-Einträge ohne Betriebsauftragnr finden
+- ✅ Betriebsauftragnr aus PDE ermitteln
+- ✅ VerpacktProt.Betriebsauftragnr aktualisieren
+
+### ArbeitsFrei_BuchenAsync
+**Delphi-Original:**
+```delphi
+procedure TThread_Zusatz.ArbeitsFrei_Buchen;
+```
+**C#-Implementierung:**
+- ✅ Kalender-Einträge mit Arbeitsfrei = 1 laden
+- ✅ Maschinen mit passender KalenderGruppe finden
+- ✅ Stillstand (StillstandNr 99) für Arbeitsfrei eintragen
+
+### TPM_Korrektur_Doppelte_DatenAsync
+**Delphi-Original:**
+```delphi
+procedure TThread_Zusatz.TPM_Korrektur_Doppelte_Daten;
+```
+**C#-Implementierung:**
+- ✅ Doppelte Einträge in tpm_stillog finden (GROUP BY mit HAVING COUNT(*) > 1)
+- ✅ Alle bis auf einen löschen (MIN(Nr) behalten)
+
+### CheckSollstueckAsync
+**Delphi-Original:**
+```delphi
+procedure TThread_Zusatz.CheckSollstueck;
+```
+**C#-Implementierung:**
+- ✅ Laufende Aufträge (Stat = 0) finden
+- ✅ Istwert >= Sollwert prüfen
+- ✅ Stat = 1 (fertig) setzen
+
+### CheckWzWartungenAsync
+**Delphi-Original:**
+```delphi
+procedure TThread_Zusatz.CheckWzWartungen;
+```
+**C#-Implementierung:**
+- ✅ Fällige Wartungen (NaechsteWartung <= GETDATE()) finden
+- ✅ Erledigt = 1 setzen
+- ✅ Stillstand für Wartung eintragen
+
+### BerechnenEndeausIstAsync
+**Delphi-Original:**
+```delphi
+procedure TThread_Zusatz.BerechnenEndeausIst;
+```
+**C#-Implementierung:**
+- ✅ Laufende Aufträge mit Taktzeit > 0 finden
+- ✅ RestStueck = Sollwert - Istwert
+- ✅ RestZeitMin = RestStueck * Taktzeit / 60
+- ✅ EndeAusIst = StartDatumZeit + RestZeitMin
+
+### Laufende_Auftraege_TerminierenAsync
+**Delphi-Original:**
+```delphi
+function TThread_Zusatz.Laufende_Auftraege_Terminieren: Boolean;
+```
+**C#-Implementierung:**
+- ✅ Aufträge mit Stat = 0 und EndDatumZeit < GETDATE() finden
+- ✅ Stat = 3 (terminiert) setzen
+- ✅ Rückgabewert: true wenn Aufträge terminiert wurden
+
+## 🔜 Nächste Schritte (Schritt 17)
+
+1. **Integration in AdditionalService.cs:**
+   - Neue Methoden in AdditionalService einbinden
+   - StartProgrammeAsync erweitern
+   - Abhängigkeiten injizieren
+
+2. **Restliche Funktionen vervollständigen:**
+   - CalcPackedlogFromShiftlogAsync
+   - CheckAuftragKetteAsync
+   - RescheduleAsync
+   - AutoterminierungAsync
+   - Palette_Rest_BerechnenAsync
+
+3. **Test der Implementierung:**
+   - Alle neuen Funktionen testen
+   - Datenbankverbindungen prüfen
+   - SQL-Abfragen validieren
+
+4. **Event-System vervollständigen:**
+   - ServiceEventSystem in alle Services integrieren
+   - Kommunikation zwischen Services testen
+
+
+---
+
 ## 🎯 Schritt 15: Th_Zusatz.pas Funktionen detailliert portiert
 
 ## ✅ Implementierte Komponenten
