@@ -21,6 +21,7 @@ namespace INCLService.CSharp.Services
         private readonly ILogger<S7MainService> _logger;
         private readonly IConfiguration _configuration;
         private readonly AppConfig _appConfig;
+        private readonly ServiceEventSystem _serviceEvents;
         
         private CommonDB _database;
         private bool _hochlauf = true;
@@ -86,9 +87,18 @@ namespace INCLService.CSharp.Services
         public S7MainService(
             ILogger<S7MainService> logger,
             IConfiguration configuration)
+            : this(logger, configuration, null)
+        {
+        }
+        
+        public S7MainService(
+            ILogger<S7MainService> logger,
+            IConfiguration configuration,
+            ServiceEventSystem serviceEvents)
         {
             _logger = logger;
             _configuration = configuration;
+            _serviceEvents = serviceEvents ?? ServiceEvents.Instance;
             
             _appConfig = new AppConfig();
             _configuration.GetSection("Database").Bind(_appConfig.Database);
@@ -105,6 +115,22 @@ namespace INCLService.CSharp.Services
             LoadConfiguration();
         }
 
+        /// <summary>
+        /// Setzt das Event für S7MainService
+        /// </summary>
+        public void SetEvent(string eventName)
+        {
+            _serviceEvents.SetEvent(eventName);
+        }
+        
+        /// <summary>
+        /// Pulses das Event für S7MainService
+        /// </summary>
+        public void PulseEvent(string eventName)
+        {
+            _serviceEvents.PulseEvent(eventName);
+        }
+        
         private void InitializeDatabase()
         {
             try
