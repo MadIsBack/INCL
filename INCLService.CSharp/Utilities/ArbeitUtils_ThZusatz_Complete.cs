@@ -48,65 +48,64 @@ namespace INCLService.CSharp.Utilities
                                tpm_stillog.STILLSTANDNR, tpm_stillog.MASCHNR, 
                                tpm_stillstaende.GRUPPE, tpm_stillog.userid, tpm_stillog.hostname, 
                                tpm_stillog.lastchange
-                        FROM tpm_stillog, tpm_stillstaende 
-                        WHERE tpm_stillog.STILLSTANDNR = tpm_stillstaende.STILLSTANDNR 
-                        AND tpm_stillstaende.GRUPPE = 1 
-                        AND tpm_stillog.RUESTPROT = 0 
-                        AND tpm_stillog.geht > 0";
+                        FROM tpm_stillog 
+                        LEFT JOIN tpm_stillstaende ON tpm_stillog.STILLSTANDNR = tpm_stillstaende.STILLSTANDNR
+                        WHERE tpm_stillog.RUESTPROT = 0 
+                        AND tpm_stillog.GEHT > 0 
+                        AND tpm_stillstaende.GRUPPE = 1";
                 
                 using (var reader = _database.ExecuteReader(sql))
                 {
                     while (await reader.ReadAsync(stoppingToken))
                     {
-                        string Nr = reader.GetString(0);
-                        DateTime Kommt = reader.GetDateTime(1);
-                        DateTime Geht = reader.GetDateTime(2);
-                        string StillstandNr = reader.GetString(3);
-                        int MaschNr = reader.GetInt32(4);
-                        int Gruppe = reader.GetInt32(5);
-                        int UserId = reader.GetInt32(6);
-                        string Hostname = reader.GetString(7);
-                        DateTime LastChange = reader.GetDateTime(8);
+                        int nr = reader.GetInt32(0);
+                        DateTime kommt = reader.GetDateTime(1);
+                        DateTime geht = reader.GetDateTime(2);
+                        int stillstandNr = reader.GetInt32(3);
+                        int maschnr = reader.GetInt32(4);
+                        int gruppe = reader.GetInt32(5);
                         
-                        // Maschinen-Lizenz ermitteln
-                        string Lizenz = await GetMaschineLizenzAsync(MaschNr, stoppingToken);
-                        
-                        // Prüfen, ob ein laufender Auftrag für diese Maschine existiert
-                        sql = $@"SELECT Betriebsauftragnr, Werkzeug 
-                            FROM PDE 
-                            WHERE LIZENZ = '{Lizenz}' AND stat = 0";
-                        
-                        string BANr = string.Empty;
-                        int Werkzeug = 0;
-                        
-                        using (var reader2 = _database.ExecuteReader(sql))
+                        if (gruppe == 1) // RÜSTEN
                         {
-                            if (await reader2.ReadAsync(stoppingToken))
+                            // Maschinen-Lizenz ermitteln
+                            string lizenz = await GetMaschineLizenzAsync(maschnr, stoppingToken);
+                            
+                            // PDE-Auftrag für diese Maschine und Zeit finden
+                            string pdeSql = $@"SELECT Nr, Betriebsauftragnr FROM PDE 
+                                            WHERE Maschine = '{lizenz}' 
+                                            AND StartDatumZeit <= '{S7MainServiceExtensions.FloatToPunktString(geht)}' 
+                                            AND (EndDatumZeit >= '{S7MainServiceExtensions.FloatToPunktString(kommt)}' OR EndDatumZeit = 0)
+                                            AND Stat = 0";
+                            
+                            string betriebsauftragnr = string.Empty;
+                            string pdeNr = string.Empty;
+                            
+                            using (var pdeReader = _database.ExecuteReader(pdeSql))
                             {
-                                BANr = reader2.GetString(0);
-                                Werkzeug = reader2.GetInt32(1);
+                                if (await pdeReader.ReadAsync(stoppingToken))
+                                {
+                                    pdeNr = pdeReader.GetString(0);
+                                    betriebsauftragnr = pdeReader.GetString(1);
+                                }
                             }
-                        }
-                        
-                        if (!string.IsNullOrEmpty(BANr))
-                        {
-                            // Rüstzeit berechnen
-                            double Ruestzeit = (Geht - Kommt).TotalMinutes;
                             
-                            // Rüstzeitprotokoll aktualisieren
-                            sql = $@"UPDATE tpm_stillog 
-                                SET RUESTPROT = 1 
-                                WHERE NR = {Nr}";
-                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                            
-                            // Rüstzeit in PDE eintragen
-                            sql = $@"UPDATE PDE 
-                                SET Ruestzeit = Ruestzeit + {Ruestzeit} 
-                                WHERE LIZENZ = '{Lizenz}' AND stat = 0";
-                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                            
-                            _logger.LogDebug("Rüstzeit verbucht: Stillstand {Nr}, Maschine {MaschNr}, Rüstzeit {Ruestzeit} min", 
-                                Nr, MaschNr, Ruestzeit);
+                            if (!string.IsNullOrEmpty(betriebsauftragnr))
+                            {
+                                // Rüstzeit berechnen (in Minuten)
+                                double ruestzeit = (geht - kommt).TotalMinutes;
+                                
+                                // RÜSTPROT = 1 setzen
+                                sql = $@"UPDATE tpm_stillog SET RUESTPROT = 1 WHERE NR = {nr}";
+                                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                                
+                                // Rüstzeit in PDE eintragen
+                                sql = $@"UPDATE PDE SET Ruestzeit = Ruestzeit + {ruestzeit} 
+                                        WHERE Nr = '{pdeNr}'";
+                                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                                
+                                _logger.LogDebug("Rüstprotokoll: Stillstand {Nr} verbucht, Rüstzeit: {Ruestzeit} Min, PDE: {PdeNr}", 
+                                    nr, ruestzeit, pdeNr);
+                            }
                         }
                     }
                 }
@@ -120,13 +119,13 @@ namespace INCLService.CSharp.Utilities
         }
         
         /// <summary>
-        /// Gibt die Lizenz für eine Maschinen-Nummer zurück
+        /// Gibt die Maschinen-Lizenz für eine Maschinen-Nummer zurück
         /// </summary>
-        private async Task<string> GetMaschineLizenzAsync(int maschNr, CancellationToken stoppingToken)
+        private async Task<string> GetMaschineLizenzAsync(int maschinenNr, CancellationToken stoppingToken)
         {
             try
             {
-                string sql = $@"SELECT Lizenz FROM Maschinen WHERE Nr = {maschNr}";
+                string sql = $@"SELECT Lizenz FROM Maschinen WHERE Maschnr = {maschinenNr}";
                 using (var reader = _database.ExecuteReader(sql))
                 {
                     if (await reader.ReadAsync(stoppingToken))
@@ -138,13 +137,13 @@ namespace INCLService.CSharp.Utilities
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in GetMaschineLizenz for Maschine {MaschNr}", maschNr);
+                _logger.LogError(ex, "Error in GetMaschineLizenz for Maschnr {MaschinenNr}", maschinenNr);
                 return string.Empty;
             }
         }
         
         /// <summary>
-        /// Fügt Job-Nummern in Downtime-Log ein
+        /// Job-Nummern in Downtime-Log eintragen
         /// Äquivalent zu TThread_Zusatz.Job_No_to_Downtime_Log in Th_Zusatz.pas
         /// </summary>
         public async Task Job_No_to_Downtime_LogAsync(CancellationToken stoppingToken)
@@ -153,10 +152,8 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("Job_No_to_Downtime_Log started");
                 
-                // Diese Funktion fügt Job-Nummern in das Downtime-Log ein
-                
-                // Stillstände ohne Job-Nummer finden
-                string sql = @"SELECT Nr, MaschineNr, StillstandNr, Kommt, Geht 
+                // Stillstände ohne JobNo finden
+                string sql = @"SELECT Nr, MaschineNr, Kommt, Geht, StillstandNr 
                             FROM Stillstand 
                             WHERE JobNo IS NULL OR JobNo = ''";
                 
@@ -166,23 +163,27 @@ namespace INCLService.CSharp.Utilities
                     {
                         int stillstandNr = reader.GetInt32(0);
                         int maschineNr = reader.GetInt32(1);
-                        int stillstandTypNr = reader.GetInt32(2);
-                        DateTime kommt = reader.GetDateTime(3);
-                        DateTime geht = reader.GetDateTime(4);
+                        DateTime kommt = reader.GetDateTime(2);
+                        DateTime geht = reader.GetDateTime(3);
+                        int stillstandTypNr = reader.GetInt32(4);
                         
-                        // Job-Nummer aus PDE oder Auftrag ermitteln
-                        string jobNo = await GetJobNoForMaschineAsync(maschineNr, kommt, geht, stoppingToken);
+                        // Maschinen-Lizenz ermitteln
+                        string lizenz = await GetMaschineLizenzAsync(maschineNr, stoppingToken);
                         
-                        if (!string.IsNullOrEmpty(jobNo))
+                        if (!string.IsNullOrEmpty(lizenz))
                         {
-                            // Job-Nummer in Stillstand eintragen
-                            sql = $@"UPDATE Stillstand 
-                                SET JobNo = '{jobNo}' 
-                                WHERE Nr = {stillstandNr}";
-                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                            // JobNo aus PDE oder Auftrag ermitteln
+                            string jobNo = await GetJobNoForMaschineAsync(lizenz, kommt, geht, stoppingToken);
                             
-                            _logger.LogDebug("JobNo eingetragen: Stillstand {StillstandNr}, JobNo {JobNo}", 
-                                stillstandNr, jobNo);
+                            if (!string.IsNullOrEmpty(jobNo))
+                            {
+                                // JobNo in Stillstand eintragen
+                                sql = $@"UPDATE Stillstand SET JobNo = '{jobNo}' WHERE Nr = {stillstandNr}";
+                                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                                
+                                _logger.LogDebug("JobNo zu Stillstand hinzugefügt: Stillstand {StillstandNr}, JobNo {JobNo}", 
+                                    stillstandNr, jobNo);
+                            }
                         }
                     }
                 }
@@ -196,25 +197,32 @@ namespace INCLService.CSharp.Utilities
         }
         
         /// <summary>
-        /// Gibt die Job-Nummer für eine Maschine in einem Zeitbereich zurück
+        /// Ermittelt die JobNo für eine Maschine in einem Zeitbereich
         /// </summary>
-        private async Task<string> GetJobNoForMaschineAsync(int maschineNr, DateTime kommt, DateTime geht, CancellationToken stoppingToken)
+        private async Task<string> GetJobNoForMaschineAsync(string lizenz, DateTime kommt, DateTime geht, CancellationToken stoppingToken)
         {
             try
             {
-                // Maschinen-Lizenz ermitteln
-                string lizenz = await GetMaschineLizenzAsync(maschineNr, stoppingToken);
+                // Zuerst in PDE suchen
+                string sql = $@"SELECT Betriebsauftragnr FROM PDE 
+                                WHERE Maschine = '{lizenz}' 
+                                AND StartDatumZeit <= '{S7MainServiceExtensions.FloatToPunktString(geht)}' 
+                                AND (EndDatumZeit >= '{S7MainServiceExtensions.FloatToPunktString(kommt)}' OR EndDatumZeit = 0)
+                                AND Stat = 0";
                 
-                if (string.IsNullOrEmpty(lizenz))
+                using (var reader = _database.ExecuteReader(sql))
                 {
-                    return string.Empty;
+                    if (await reader.ReadAsync(stoppingToken))
+                    {
+                        return reader.GetString(0);
+                    }
                 }
                 
-                // Job-Nummer aus PDE ermitteln
-                string sql = $@"SELECT JobNo FROM PDE 
-                            WHERE LIZENZ = '{lizenz}' 
-                            AND StartDatumZeit <= '{S7MainServiceExtensions.FloatToPunktString(kommt)}' 
-                            AND EndDatumZeit >= '{S7MainServiceExtensions.FloatToPunktString(geht)}'";
+                // Dann in AArchiv suchen
+                sql = $@"SELECT Betriebsauftragnr FROM AArchiv 
+                        WHERE Maschine = '{lizenz}' 
+                        AND StartDatumZeit <= '{S7MainServiceExtensions.FloatToPunktString(geht)}' 
+                        AND EndDatumZeit >= '{S7MainServiceExtensions.FloatToPunktString(kommt)}'";
                 
                 using (var reader = _database.ExecuteReader(sql))
                 {
@@ -234,7 +242,7 @@ namespace INCLService.CSharp.Utilities
         }
         
         /// <summary>
-        /// Bucht kurze Verzögerungen automatisch
+        /// Kurze Verzögerungen automatisch buchen
         /// Äquivalent zu TThread_Zusatz.Book_Short_Delay in Th_Zusatz.pas
         /// </summary>
         public async Task Book_Short_DelayAsync(CancellationToken stoppingToken)
@@ -243,43 +251,51 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("Book_Short_Delay started");
                 
-                // Diese Funktion bucht automatisch alle Stillstände auf "SHORT STOP",
-                // die kleiner als SHORT_DELAY_AUTO_BOOK_VALUE sind und die nicht gebucht sind.
-                // Es wird die System-StillstandNr 5 verwendet
+                // Ungebuchte Stillstände mit kurzer Dauer finden
+                string sql = @"SELECT Nr, MaschineNr, Kommt, Geht, Dauer, StillstandNr 
+                            FROM Stillstand 
+                            WHERE Gebucht = 0 
+                            AND Dauer < @ShortDelayValue";
                 
-                // Falls Feld Maschine.SHORT_DELAY > 0, dann wird das Feld SHORT_DELAY anstatt SHORT_DELAY_AUTO_BOOK_VALUE genommen.
-                
-                // Stillstände finden, die nicht gebucht sind und kürzer als SHORT_DELAY_AUTO_BOOK_VALUE Minuten sind
-                string sql = $@"SELECT s.Nr, s.Dauer, s.MaschineNr, m.SHORT_DELAY 
-                            FROM Stillstand s 
-                            LEFT JOIN Maschinen m ON m.Nr = s.MaschineNr
-                            WHERE s.Gebucht = 0 
-                            AND s.Dauer > 0 
-                            AND s.Dauer < {SHORT_DELAY_AUTO_BOOK_VALUE}";
+                // Parameter hinzufügen
+                sql = sql.Replace("@ShortDelayValue", SHORT_DELAY_AUTO_BOOK_VALUE.ToString());
                 
                 using (var reader = _database.ExecuteReader(sql))
                 {
                     while (await reader.ReadAsync(stoppingToken))
                     {
                         int stillstandNr = reader.GetInt32(0);
-                        int dauer = reader.GetInt32(1);
-                        int maschineNr = reader.GetInt32(2);
-                        int machineShortDelay = reader.GetInt32(3);
+                        int maschineNr = reader.GetInt32(1);
+                        DateTime kommt = reader.GetDateTime(2);
+                        DateTime geht = reader.GetDateTime(3);
+                        int dauer = reader.GetInt32(4);
+                        int stillstandTypNr = reader.GetInt32(5);
                         
-                        // Falls Maschine.SHORT_DELAY > 0, dann dieses verwenden
-                        int maxDauer = machineShortDelay > 0 ? machineShortDelay : SHORT_DELAY_AUTO_BOOK_VALUE;
+                        // Maschinen-spezifischen Short_Delay-Wert prüfen
+                        int machineShortDelay = SHORT_DELAY_AUTO_BOOK_VALUE;
+                        string checkSql = $@"SELECT SHORT_DELAY FROM Maschinen WHERE Maschnr = {maschineNr}";
                         
-                        if (dauer < maxDauer)
+                        using (var checkReader = _database.ExecuteReader(checkSql))
                         {
-                            // Stillstand als SHORT STOP buchen (StillstandNr 5)
-                            sql = $@"UPDATE Stillstand 
-                                SET StillstandNr = 5, Gebucht = 1
-                                WHERE Nr = {stillstandNr}";
-                            
+                            if (await checkReader.ReadAsync(stoppingToken))
+                            {
+                                int? shortDelay = checkReader.GetValue<int?>(0);
+                                if (shortDelay.HasValue && shortDelay.Value > 0)
+                                {
+                                    machineShortDelay = shortDelay.Value;
+                                }
+                            }
+                        }
+                        
+                        // Nur buchen, wenn Dauer kleiner als der Maschinen-spezifische Wert
+                        if (dauer < machineShortDelay)
+                        {
+                            // Als SHORT STOP (StillstandNr 5) buchen
+                            sql = $@"UPDATE Stillstand SET Gebucht = 1, StillstandNr = 5 WHERE Nr = {stillstandNr}";
                             await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                             
-                            _logger.LogDebug("Booked short delay: Stillstand {StillstandNr}, Maschine {MaschineNr}, Dauer {Dauer} min", 
-                                stillstandNr, maschineNr, dauer);
+                            _logger.LogDebug("Kurze Verzögerung gebucht: Stillstand {StillstandNr}, Dauer: {Dauer} Min", 
+                                stillstandNr, dauer);
                         }
                     }
                 }
@@ -293,7 +309,7 @@ namespace INCLService.CSharp.Utilities
         }
         
         /// <summary>
-        /// Prüft Verpackt-Protokoll
+        /// Verpackt-Protokoll prüfen
         /// Äquivalent zu TThread_Zusatz.CheckVerpacktProt in Th_Zusatz.pas
         /// </summary>
         public async Task CheckVerpacktProtAsync(CancellationToken stoppingToken)
@@ -302,11 +318,8 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("CheckVerpacktProt started");
                 
-                // Verpackt-Protokoll prüfen und ggf. korrigieren
-                // Hier würde die Logik aus Delphi implementiert werden
-                
-                // Beispiel: Verpackt-Einträge ohne Betriebsauftragnr finden
-                string sql = @"SELECT Nr, Datum, Betriebsauftragnr, Zugang, Abgang 
+                // VerpacktProt-Einträge ohne Betriebsauftragnr finden
+                string sql = @"SELECT Nr, Barcode, ZugangsDatum, ZugangsZeit 
                             FROM VerpacktProt 
                             WHERE Betriebsauftragnr IS NULL OR Betriebsauftragnr = ''";
                 
@@ -314,27 +327,22 @@ namespace INCLService.CSharp.Utilities
                 {
                     while (await reader.ReadAsync(stoppingToken))
                     {
-                        int nr = reader.GetInt32(0);
-                        DateTime datum = reader.GetDateTime(1);
-                        string betriebsauftragnr = reader.GetString(2);
-                        int zugang = reader.GetInt32(3);
-                        int abgang = reader.GetInt32(4);
+                        int verpacktProtNr = reader.GetInt32(0);
+                        string barcode = reader.GetString(1);
+                        DateTime zugangsDatum = reader.GetDateTime(2);
+                        DateTime zugangsZeit = reader.GetDateTime(3);
                         
-                        // Betriebsauftragnr aus PDE ermitteln
-                        if (string.IsNullOrEmpty(betriebsauftragnr))
+                        // Betriebsauftragnr aus PDE oder AArchiv ermitteln
+                        string betriebsauftragnr = await GetBetriebsauftragnrForDateAsync(barcode, zugangsDatum, zugangsZeit, stoppingToken);
+                        
+                        if (!string.IsNullOrEmpty(betriebsauftragnr))
                         {
-                            string newBetriebsauftragnr = await GetBetriebsauftragnrForDateAsync(datum, stoppingToken);
+                            // Betriebsauftragnr in VerpacktProt eintragen
+                            sql = $@"UPDATE VerpacktProt SET Betriebsauftragnr = '{betriebsauftragnr}' WHERE Nr = {verpacktProtNr}";
+                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                             
-                            if (!string.IsNullOrEmpty(newBetriebsauftragnr))
-                            {
-                                sql = $@"UPDATE VerpacktProt 
-                                    SET Betriebsauftragnr = '{newBetriebsauftragnr}'
-                                    WHERE Nr = {nr}";
-                                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                                
-                                _logger.LogDebug("VerpacktProt korrigiert: Nr {Nr}, neuer Betriebsauftrag {Betriebsauftragnr}", 
-                                    nr, newBetriebsauftragnr);
-                            }
+                            _logger.LogDebug("Betriebsauftragnr zu VerpacktProt hinzugefügt: VerpacktProt {VerpacktProtNr}, Betriebsauftragnr {Betriebsauftragnr}", 
+                                verpacktProtNr, betriebsauftragnr);
                         }
                     }
                 }
@@ -348,16 +356,33 @@ namespace INCLService.CSharp.Utilities
         }
         
         /// <summary>
-        /// Gibt die Betriebsauftragnr für ein Datum zurück
+        /// Ermittelt die Betriebsauftragnr für ein Datum und Barcode
         /// </summary>
-        private async Task<string> GetBetriebsauftragnrForDateAsync(DateTime datum, CancellationToken stoppingToken)
+        private async Task<string> GetBetriebsauftragnrForDateAsync(string barcode, DateTime datum, DateTime zeit, CancellationToken stoppingToken)
         {
             try
             {
-                // Betriebsauftrag für dieses Datum finden
+                DateTime datumZeit = new DateTime(datum.Year, datum.Month, datum.Day, zeit.Hour, zeit.Minute, zeit.Second);
+                
+                // In PDE suchen
                 string sql = $@"SELECT Betriebsauftragnr FROM PDE 
-                            WHERE StartDatumZeit <= '{S7MainServiceExtensions.FloatToPunktString(datum)}' 
-                            AND EndDatumZeit >= '{S7MainServiceExtensions.FloatToPunktString(datum)}'";
+                                WHERE (Barcode = '{barcode}' OR Barcode2 = '{barcode}')
+                                AND StartDatumZeit <= '{S7MainServiceExtensions.FloatToPunktString(datumZeit)}' 
+                                AND (EndDatumZeit >= '{S7MainServiceExtensions.FloatToPunktString(datumZeit)}' OR EndDatumZeit = 0)";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    if (await reader.ReadAsync(stoppingToken))
+                    {
+                        return reader.GetString(0);
+                    }
+                }
+                
+                // In AArchiv suchen
+                sql = $@"SELECT Betriebsauftragnr FROM AArchiv 
+                        WHERE (Barcode = '{barcode}' OR Barcode2 = '{barcode}')
+                        AND StartDatumZeit <= '{S7MainServiceExtensions.FloatToPunktString(datumZeit)}' 
+                        AND EndDatumZeit >= '{S7MainServiceExtensions.FloatToPunktString(datumZeit)}'";
                 
                 using (var reader = _database.ExecuteReader(sql))
                 {
@@ -377,7 +402,7 @@ namespace INCLService.CSharp.Utilities
         }
         
         /// <summary>
-        /// Bucht Arbeitsfrei-Zeiten
+        /// Arbeitsfrei-Zeiten buchen
         /// Äquivalent zu TThread_Zusatz.ArbeitsFrei_Buchen in Th_Zusatz.pas
         /// </summary>
         public async Task ArbeitsFrei_BuchenAsync(CancellationToken stoppingToken)
@@ -386,31 +411,64 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("ArbeitsFrei_Buchen started");
                 
-                // Arbeitsfreie Zeiten aus Kalender ermitteln
-                string sql = @"SELECT Datum, KalenderGruppe FROM Kalender 
+                // Kalender-Einträge mit Arbeitsfrei = 1 laden
+                string sql = @"SELECT Nr, KalenderGruppe, Datum, Bezeichnung 
+                            FROM Kalender 
                             WHERE Arbeitsfrei = 1 
-                            AND Datum >= DATEADD(day, -7, GETDATE())";
+                            AND Datum >= CAST(GETDATE() AS DATE)";
                 
                 using (var reader = _database.ExecuteReader(sql))
                 {
                     while (await reader.ReadAsync(stoppingToken))
                     {
-                        DateTime datum = reader.GetDateTime(0);
+                        int kalenderNr = reader.GetInt32(0);
                         int kalenderGruppe = reader.GetInt32(1);
+                        DateTime datum = reader.GetDateTime(2);
+                        string bezeichnung = reader.GetString(3);
                         
-                        // Maschinen mit dieser Kalendergruppe finden
-                        sql = $@"SELECT Nr, Lizenz FROM Maschinen 
-                                WHERE KalenderGruppe = {kalenderGruppe}";
+                        // Maschinen mit passender KalenderGruppe finden
+                        sql = $@"SELECT Nr, Lizenz FROM Maschinen WHERE KalenderGruppe = {kalenderGruppe}";
                         
-                        using (var reader2 = _database.ExecuteReader(sql))
+                        using (var maschinenReader = _database.ExecuteReader(sql))
                         {
-                            while (await reader2.ReadAsync(stoppingToken))
+                            while (await maschinenReader.ReadAsync(stoppingToken))
                             {
-                                int maschineNr = reader2.GetInt32(0);
-                                string lizenz = reader2.GetString(1);
+                                int maschinenNr = maschinenReader.GetInt32(0);
+                                string lizenz = maschinenReader.GetString(1);
                                 
-                                // Arbeitsfrei buchen
-                                await BuchArbeitsFreiAsync(lizenz, datum, stoppingToken);
+                                // Prüfen, ob bereits ein Stillstand für diese Maschine an diesem Datum existiert
+                                string checkSql = $@"SELECT COUNT(*) FROM Stillstand 
+                                                    WHERE MaschineNr = {maschinenNr} 
+                                                    AND StillstandNr = 99 
+                                                    AND Kommt >= '{S7MainServiceExtensions.FloatToPunktString(datum)}' 
+                                                    AND Kommt < '{S7MainServiceExtensions.FloatToPunktString(datum.AddDays(1))}'";
+                                
+                                bool exists = false;
+                                using (var checkReader = _database.ExecuteReader(checkSql))
+                                {
+                                    if (await checkReader.ReadAsync(stoppingToken))
+                                    {
+                                        exists = checkReader.GetInt32(0) > 0;
+                                    }
+                                }
+                                
+                                if (!exists)
+                                {
+                                    // Arbeitsfrei als Stillstand (StillstandNr 99) buchen
+                                    DateTime kommt = datum;
+                                    DateTime geht = datum.AddHours(8); // 8 Stunden Arbeitsfrei
+                                    
+                                    sql = $@"INSERT INTO Stillstand (MaschineNr, StillstandNr, Kommt, Geht, Gebucht, Grund) 
+                                            VALUES ({maschinenNr}, 99, 
+                                                    '{S7MainServiceExtensions.FloatToPunktString(kommt)}', 
+                                                    '{S7MainServiceExtensions.FloatToPunktString(geht)}', 
+                                                    1, 'Arbeitsfrei: {bezeichnung}')";
+                                    
+                                    await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                                    
+                                    _logger.LogDebug("Arbeitsfrei gebucht: Maschine {MaschinenNr}, Datum {Datum}, Bezeichnung {Bezeichnung}", 
+                                        maschinenNr, datum.ToString("yyyy-MM-dd"), bezeichnung);
+                                }
                             }
                         }
                     }
@@ -425,110 +483,55 @@ namespace INCLService.CSharp.Utilities
         }
         
         /// <summary>
-        /// Bucht Arbeitsfrei für eine Maschine an einem bestimmten Datum
+        /// TPM-Korrektur für doppelte Daten
+        /// Äquivalent zu TThread_Zusatz.TPM_Korrektur_Doppelte_Daten in Th_Zusatz.pas
         /// </summary>
-        private async Task BuchArbeitsFreiAsync(string lizenz, DateTime datum, CancellationToken stoppingToken)
+        public async Task TPM_Korrektur_Doppelte_DatenAsync(CancellationToken stoppingToken)
         {
             try
             {
-                // Prüfen, ob bereits ein Stillstand für diese Maschine an diesem Datum existiert
-                string sql = $@"SELECT COUNT(*) FROM Stillstand 
-                            WHERE MaschineNr = (SELECT Nr FROM Maschinen WHERE Lizenz = '{lizenz}') 
-                            AND Kommt <= '{S7MainServiceExtensions.FloatToPunktString(datum)}' 
-                            AND Geht >= '{S7MainServiceExtensions.FloatToPunktString(datum.AddDays(1))}'";
+                _logger.LogDebug("TPM_Korrektur_Doppelte_Daten started");
                 
-                int count = 0;
+                // Doppelte Einträge in tpm_stillog finden
+                string sql = @"SELECT maschnr, datum, schicht, BETRIEBSAUFTRAGNR, COUNT(*) CNT 
+                            FROM tpm_stillog 
+                            GROUP BY maschnr, datum, schicht, BETRIEBSAUFTRAGNR
+                            HAVING COUNT(*) > 1";
+                
                 using (var reader = _database.ExecuteReader(sql))
                 {
-                    if (await reader.ReadAsync(stoppingToken))
+                    while (await reader.ReadAsync(stoppingToken))
                     {
-                        count = reader.GetInt32(0);
+                        string maschnr = reader.GetString(0);
+                        DateTime datum = reader.GetDateTime(1);
+                        int schicht = reader.GetInt32(2);
+                        string betriebsauftragnr = reader.GetString(3);
+                        int count = reader.GetInt32(4);
+                        
+                        // Alle bis auf einen löschen (den mit der höchsten Nr behalten)
+                        sql = $@"DELETE FROM tpm_stillog 
+                                WHERE maschnr = '{maschnr}' 
+                                AND datum = '{S7MainServiceExtensions.FloatToPunktString(datum)}' 
+                                AND schicht = {schicht} 
+                                AND BETRIEBSAUFTRAGNR = '{betriebsauftragnr}'
+                                AND Nr <> (SELECT MAX(NR) FROM tpm_stillog 
+                                           WHERE maschnr = '{maschnr}' 
+                                           AND datum = '{S7MainServiceExtensions.FloatToPunktString(datum)}' 
+                                           AND schicht = {schicht} 
+                                           AND BETRIEBSAUFTRAGNR = '{betriebsauftragnr}')";
+                        
+                        int deleted = await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                        
+                        _logger.LogDebug("Doppelte TPM-Daten korrigiert: maschnr={Maschnr}, datum={Datum}, schicht={Schicht}, gelöscht={Deleted}", 
+                            maschnr, datum.ToString("yyyy-MM-dd"), schicht, deleted);
                     }
                 }
                 
-                if (count == 0)
-                {
-                    // Arbeitsfrei buchen
-                    int maschineNr = await GetMaschineNrByLizenzAsync(lizenz, stoppingToken);
-                    
-                    sql = $@"INSERT INTO Stillstand (MaschineNr, StillstandNr, Kommt, Geht, Gebucht) 
-                            VALUES ({maschineNr}, 99, '{S7MainServiceExtensions.FloatToPunktString(datum)}', 
-                                    '{S7MainServiceExtensions.FloatToPunktString(datum.AddDays(1))}', 1)";
-                    
-                    await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                    
-                    _logger.LogDebug("Arbeitsfrei gebucht: Maschine {Lizenz}, Datum {Datum}", lizenz, datum.ToShortDateString());
-                }
+                _logger.LogDebug("TPM_Korrektur_Doppelte_Daten completed");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in BuchArbeitsFrei for Lizenz {Lizenz}, Datum {Datum}", lizenz, datum);
-            }
-        }
-        
-        /// <summary>
-        /// Gibt die Maschinen-Nummer für eine Lizenz zurück
-        /// </summary>
-        private async Task<int> GetMaschineNrByLizenzAsync(string lizenz, CancellationToken stoppingToken)
-        {
-            try
-            {
-                string sql = $@"SELECT Nr FROM Maschinen WHERE Lizenz = '{lizenz}'";
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        return reader.GetInt32(0);
-                    }
-                }
-                return 0;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in GetMaschineNrByLizenz for Lizenz {Lizenz}", lizenz);
-                return 0;
-            }
-        }
-        
-        /// <summary>
-        /// Taktzeit pro Personal berechnen
-        /// Äquivalent zu TThread_Zusatz.Taktzeit_Personal in Th_Zusatz.pas
-        /// </summary>
-        public async Task Taktzeit_PersonalAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogDebug("Taktzeit_Personal started");
-                
-                // Taktzeiten pro Personal berechnen
-                // Hier würde die Logik aus Delphi implementiert werden
-                
-                _logger.LogDebug("Taktzeit_Personal completed");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in Taktzeit_Personal");
-            }
-        }
-        
-        /// <summary>
-        /// Mittelt Taktzeiten
-        /// Äquivalent zu TThread_Zusatz.TaktMitteln in Th_Zusatz.pas
-        /// </summary>
-        public async Task TaktMittelnAsync(bool aUpdate, CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogDebug("TaktMitteln started");
-                
-                // Taktzeiten mitteln
-                // Hier würde die Logik aus Delphi implementiert werden
-                
-                _logger.LogDebug("TaktMitteln completed");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in TaktMitteln");
+                _logger.LogError(ex, "Error in TPM_Korrektur_Doppelte_Daten");
             }
         }
         
@@ -542,8 +545,42 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("WZReparatur started");
                 
-                // Werkzeug-Reparaturen verarbeiten
-                // Hier würde die Logik aus Delphi implementiert werden
+                // Werkzeug-Reparaturen finden
+                string sql = @"SELECT Nr, Werkzeug, ReparaturDatum, ReparaturEnde, MaschineNr, Notiz 
+                            FROM WerkzeugReparatur 
+                            WHERE ReparaturEnde IS NULL 
+                            AND ReparaturDatum <= GETDATE()";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        int reparaturNr = reader.GetInt32(0);
+                        int werkzeug = reader.GetInt32(1);
+                        DateTime reparaturDatum = reader.GetDateTime(2);
+                        int maschineNr = reader.GetInt32(4);
+                        string notiz = reader.GetString(5);
+                        
+                        // Reparatur als abgeschlossen markieren
+                        sql = $@"UPDATE WerkzeugReparatur SET ReparaturEnde = GETDATE() WHERE Nr = {reparaturNr}";
+                        await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                        
+                        // Stillstand für Reparatur eintragen
+                        string lizenz = await GetMaschineLizenzAsync(maschineNr, stoppingToken);
+                        
+                        if (!string.IsNullOrEmpty(lizenz))
+                        {
+                            sql = $@"INSERT INTO Stillstand (MaschineNr, StillstandNr, Kommt, Geht, Gebucht, Grund) 
+                                    VALUES ((SELECT Nr FROM Maschinen WHERE Lizenz = '{lizenz}'), 
+                                            101, '{S7MainServiceExtensions.FloatToPunktString(reparaturDatum)}', 
+                                            GETDATE(), 1, 'Werkzeugreparatur {Werkzeug}: {Notiz}')";
+                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                        }
+                        
+                        _logger.LogDebug("Werkzeugreparatur verarbeitet: Reparatur {ReparaturNr}, Werkzeug {Werkzeug}", 
+                            reparaturNr, werkzeug);
+                    }
+                }
                 
                 _logger.LogDebug("WZReparatur completed");
             }
@@ -554,63 +591,8 @@ namespace INCLService.CSharp.Utilities
         }
         
         /// <summary>
-        /// TPM-Korrektur für doppelte Daten
-        /// Äquivalent zu TThread_Zusatz.TPM_Korrektur_Doppelte_Daten in Th_Zusatz.pas
-        /// </summary>
-        public async Task TPM_Korrektur_Doppelte_DatenAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogDebug("TPM_Korrektur_Doppelte_Daten started");
-                
-                // Doppelte TPM-Daten finden und korrigieren
-                string sql = @"SELECT MaschineNr, StillstandNr, Kommt, Geht, COUNT(*) as cnt 
-                            FROM tpm_stillog 
-                            GROUP BY MaschineNr, StillstandNr, Kommt, Geht 
-                            HAVING COUNT(*) > 1";
-                
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    while (await reader.ReadAsync(stoppingToken))
-                    {
-                        int maschineNr = reader.GetInt32(0);
-                        int stillstandNr = reader.GetInt32(1);
-                        DateTime kommt = reader.GetDateTime(2);
-                        DateTime geht = reader.GetDateTime(3);
-                        int count = reader.GetInt32(4);
-                        
-                        // Alle bis auf einen löschen
-                        sql = $@"DELETE FROM tpm_stillog 
-                                WHERE MaschineNr = {maschineNr} 
-                                AND StillstandNr = {stillstandNr} 
-                                AND Kommt = '{S7MainServiceExtensions.FloatToPunktString(kommt)}' 
-                                AND Geht = '{S7MainServiceExtensions.FloatToPunktString(geht)}' 
-                                AND NR NOT IN (
-                                    SELECT MIN(Nr) FROM tpm_stillog 
-                                    WHERE MaschineNr = {maschineNr} 
-                                    AND StillstandNr = {stillstandNr} 
-                                    AND Kommt = '{S7MainServiceExtensions.FloatToPunktString(kommt)}' 
-                                    AND Geht = '{S7MainServiceExtensions.FloatToPunktString(geht)}'
-                                )";
-                        
-                        await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                        
-                        _logger.LogDebug("Doppelte TPM-Daten korrigiert: Maschine {MaschineNr}, Stillstand {StillstandNr}, Count {Count}", 
-                            maschineNr, stillstandNr, count);
-                    }
-                }
-                
-                _logger.LogDebug("TPM_Korrektur_Doppelte_Daten completed");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in TPM_Korrektur_Doppelte_Daten");
-            }
-        }
-        
-        /// <summary>
         /// Paletten-Rest berechnen
-        /// Äquivalent zu TThread_Zusatz.Palette_Rest_Berechnen in Th_Zusatz.pas
+        /// Äquivalent zu TThread_Zusatz.Palette_Rest_Berechnen in Th_Zusatz.pas (Zeile 244)
         /// </summary>
         public async Task Palette_Rest_BerechnenAsync(CancellationToken stoppingToken)
         {
@@ -618,8 +600,34 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("Palette_Rest_Berechnen started");
                 
-                // Paletten-Rest berechnen
-                // Hier würde die Logik aus Delphi implementiert werden
+                // 1. Null-Werte in PDE aktualisieren
+                string sql = "UPDATE PDE SET Istwert = 0 WHERE Istwert IS NULL";
+                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                
+                sql = "UPDATE PDE SET Pack = 0 WHERE Pack IS NULL";
+                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                
+                // 2. Paletten_Rest und Paletten_Soll berechnen (für MSSQL)
+                sql = @"UPDATE PDE SET Paletten_Rest = 
+                    CASE 
+                        WHEN CAST(Sollwert AS int) - CAST(Pack AS int) < 0 THEN 0 
+                        ELSE 
+                            CASE 
+                                WHEN PackGroesse * Palette = 0 THEN 0 
+                                ELSE CAST((CAST(Sollwert AS int) - CAST(Pack AS int)) / PackGroesse / Palette + 0.4999 AS int) 
+                            END 
+                    END,
+                    Paletten_Soll = 
+                    CASE 
+                        WHEN PackGroesse * Palette = 0 THEN 0 
+                        ELSE CAST(CAST(Sollwert AS int) / PackGroesse / Palette + 0.4999 AS int) 
+                    END";
+                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                
+                // 3. Paletten_Rest in Maschinf aktualisieren
+                sql = @"UPDATE Maschinf SET Paletten_Rest = 
+                    (SELECT Paletten_Rest FROM PDE WHERE Maschinf.BetriebsAuftragNr = PDE.BetriebsAuftragNr)";
+                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                 
                 _logger.LogDebug("Palette_Rest_Berechnen completed");
             }

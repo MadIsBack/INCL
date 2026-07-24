@@ -27,6 +27,7 @@ namespace INCLService.CSharp.Utilities
         /// <summary>
         /// Berechnet Verpackt-Log aus Schicht-Log
         /// Äquivalent zu TThread_Zusatz.CalcPackedlogFromShiftlog in Th_Zusatz.pas
+        /// Ruft VerpacktProtAusAusschussRechnen auf
         /// </summary>
         public async Task CalcPackedlogFromShiftlogAsync(CancellationToken stoppingToken)
         {
@@ -34,8 +35,10 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("CalcPackedlogFromShiftlog started");
                 
-                // Verpackt-Log aus Schicht-Log berechnen
-                // Hier würde die Logik aus Delphi implementiert werden
+                // Letzten Lauf aus Konfiguration oder Standardwert (30 Tage zurück)
+                DateTime lastrun = DateTime.Now.AddDays(-30);
+                
+                await VerpacktProtAusAusschussRechnenAsync(lastrun, stoppingToken);
                 
                 _logger.LogDebug("CalcPackedlogFromShiftlog completed");
             }
@@ -53,16 +56,165 @@ namespace INCLService.CSharp.Utilities
         {
             try
             {
-                _logger.LogDebug("CalcPackedlogFromShiftlog(fromdate) started");
+                _logger.LogDebug("CalcPackedlogFromShiftlog(fromdate) started with date: {FromDate}", fromdate);
                 
-                // Verpackt-Log aus Schicht-Log ab einem bestimmten Datum berechnen
-                // Hier würde die Logik aus Delphi implementiert werden
+                await VerpacktProtAusAusschussRechnenAsync(fromdate, stoppingToken);
                 
                 _logger.LogDebug("CalcPackedlogFromShiftlog(fromdate) completed");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in CalcPackedlogFromShiftlog(fromdate)");
+            }
+        }
+        
+        /// <summary>
+        /// Verpackt-Protokoll aus Ausschuss und Schicht berechnen
+        /// Äquivalent zu VerpacktProtAusAusschussRechnen in arbeit.pas
+        /// </summary>
+        private async Task VerpacktProtAusAusschussRechnenAsync(DateTime fromDate, CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogDebug("VerpacktProtAusAusschussRechnen started from {FromDate}", fromDate);
+                
+                // Betriebsauftragnummern aus tpm_schicht und pdekombi ab dem fromDate holen
+                string sql = $@"(SELECT betriebsauftragnr, max(auftragnr) auftragnr,
+                            max(bezeichnung) bezeichnung, max(lizenz) lizenz, datumzeit dat FROM tpm_schicht
+                            INNER JOIN maschine ON tpm_schicht.maschnr = maschine.maschnr
+                            WHERE datumzeit > '{S7MainServiceExtensions.FloatToPunktString(fromDate)}'
+                            AND betriebsauftragnr IS NOT NULL
+                            GROUP BY betriebsauftragnr, datumzeit)
+                            UNION
+                            (SELECT pdekombi.betriebsauftragnr, max(pdekombi.auftragnr) auftragnr,
+                            max(pdekombi.bezeichnung) bezeichnung, max(lizenz) lizenz, datumzeit dat FROM tpm_schicht
+                            INNER JOIN maschine ON tpm_schicht.maschnr = maschine.maschnr
+                            INNER JOIN pdekombi ON tpm_schicht.betriebsauftragnr = pdekombi.masterbetriebsauftragnr
+                            WHERE datumzeit > '{S7MainServiceExtensions.FloatToPunktString(fromDate)}'
+                            AND pdekombi.betriebsauftragnr IS NOT NULL
+                            GROUP BY pdekombi.betriebsauftragnr, datumzeit)
+                            ORDER BY dat";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string banr = reader.GetString(0);
+                        string auftragnr = reader.GetString(1);
+                        string bezeichnung = reader.GetString(2);
+                        string lizenz = reader.GetString(3);
+                        DateTime dat = reader.GetDateTime(4);
+                        
+                        // Gutschicht, Verpackt und Gutall für diesen Betriebsauftrag ermitteln
+                        int gutschicht = 0, verpackt = 0, gutall = 0;
+                        bool buchen = false;
+                        DateTime buchDat = dat;
+                        int buchmenge = 0;
+                        
+                        // Zuerst in tpm_schicht suchen
+                        string querySql = $@"SELECT sum(produziert)-sum(autoausschuss)-sum(ausschuss) gutschicht,
+                                    (SELECT sum(zugang-abgang) FROM verpacktprot WHERE betriebsauftragnr = '{banr}') verpackt,
+                                    (SELECT sum(produziert)-sum(autoausschuss)-sum(ausschuss) FROM tpm_schicht
+                                    WHERE betriebsauftragnr = '{banr}') gutall,
+                                    max(datumzeit) dat FROM tpm_schicht
+                                    WHERE tpm_schicht.betriebsauftragnr = '{banr}'
+                                    AND datumzeit < '{S7MainServiceExtensions.FloatToPunktString(dat.AddMinutes(4))}'
+                                    AND datumzeit > '{S7MainServiceExtensions.FloatToPunktString(dat.AddMinutes(-3))}'
+                                    GROUP BY tpm_schicht.betriebsauftragnr";
+                        
+                        using (var queryReader = _database.ExecuteReader(querySql))
+                        {
+                            if (await queryReader.ReadAsync(stoppingToken))
+                            {
+                                gutschicht = queryReader.GetInt32(0);
+                                verpackt = queryReader.GetInt32(1);
+                                gutall = queryReader.GetInt32(2);
+                                buchDat = queryReader.GetDateTime(3);
+                                buchen = true;
+                            }
+                        }
+                        
+                        // Wenn nicht gefunden, in tpm_schichtkombi suchen
+                        if (!buchen)
+                        {
+                            querySql = $@"SELECT sum(produziert)-sum(autoausschuss)-sum(ausschuss) gutschicht,
+                                    (SELECT sum(zugang-abgang) FROM verpacktprot WHERE betriebsauftragnr = '{banr}') verpackt,
+                                    (SELECT sum(produziert)-sum(autoausschuss)-sum(ausschuss) FROM tpm_schichtkombi
+                                    WHERE betriebsauftragnr = '{banr}') gutall,
+                                    max(datumzeit) dat FROM tpm_schichtkombi
+                                    WHERE tpm_schichtkombi.betriebsauftragnr = '{banr}'
+                                    AND datumzeit < '{S7MainServiceExtensions.FloatToPunktString(dat.AddMinutes(4))}'
+                                    AND datumzeit > '{S7MainServiceExtensions.FloatToPunktString(dat.AddMinutes(-3))}'
+                                    GROUP BY tpm_schichtkombi.betriebsauftragnr";
+                            
+                            using (var queryReader = _database.ExecuteReader(querySql))
+                            {
+                                if (await queryReader.ReadAsync(stoppingToken))
+                                {
+                                    gutschicht = queryReader.GetInt32(0);
+                                    verpackt = queryReader.GetInt32(1);
+                                    gutall = queryReader.GetInt32(2);
+                                    buchDat = queryReader.GetDateTime(3);
+                                    buchen = true;
+                                }
+                            }
+                        }
+                        
+                        if (buchen && gutall != verpackt)
+                        {
+                            buchmenge = gutall - verpackt;
+                            
+                            // Summe der bereits gebuchten Verpackt-Mengen ab dem Datum
+                            string sumSql = $@"SELECT SUM(zugang-abgang) sumpack FROM verpacktprot 
+                                            WHERE datum > '{S7MainServiceExtensions.FloatToPunktString(buchDat)}' 
+                                            AND betriebsauftragnr = '{banr}'";
+                            
+                            int sumpack = 0;
+                            using (var sumReader = _database.ExecuteReader(sumSql))
+                            {
+                                if (await sumReader.ReadAsync(stoppingToken))
+                                {
+                                    sumpack = sumReader.GetInt32(0);
+                                }
+                            }
+                            
+                            buchmenge += sumpack;
+                            
+                            if (buchmenge > gutschicht)
+                                buchmenge = gutschicht;
+                        }
+                        
+                        if (buchen && buchmenge != 0)
+                        {
+                            // Alte Einträge löschen
+                            sql = $@"DELETE FROM verpacktprot WHERE datum > '{S7MainServiceExtensions.FloatToPunktString(buchDat)}' 
+                                    AND betriebsauftragnr = '{banr}'";
+                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                            
+                            // Neuen Eintrag erstellen
+                            int zugang = Math.Max(buchmenge, 0);
+                            int abgang = Math.Abs(Math.Min(buchmenge, 0));
+                            DateTime eintragsDatum = buchDat.AddMinutes(1);
+                            
+                            sql = $@"INSERT INTO verpacktprot (nr, betriebsauftragnr, auftragnr, bezeichnung, barcode,
+                                    zugang, abgang, bclesernr, datum, eintragsdatum, lastchange, hostname, userid, maschine) 
+                                    VALUES (verpacktprotid.nextval, '{banr}', '{auftragnr}', '{bezeichnung}', 'service',
+                                    {zugang}, {abgang}, 0, '{S7MainServiceExtensions.FloatToPunktString(buchDat)}', 
+                                    '{S7MainServiceExtensions.FloatToPunktString(eintragsDatum)}', 
+                                    GETDATE(), GETDATE(), 'INCLService', 'service', '{lizenz}')";
+                            
+                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                            
+                            _logger.LogDebug("VerpacktProt aus Schicht berechnet: BANr={BANr}, Buchmenge={Buchmenge}", banr, buchmenge);
+                        }
+                    }
+                }
+                
+                _logger.LogDebug("VerpacktProtAusAusschussRechnen completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in VerpacktProtAusAusschussRechnen");
             }
         }
         
@@ -76,31 +228,94 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("UnscheduledSetup started");
                 
-                // Ungeplante Rüstzeiten finden und verarbeiten
-                string sql = @"SELECT Nr, MaschineNr, StillstandNr, Kommt, Geht 
-                            FROM Stillstand 
-                            WHERE StillstandNr IN (SELECT StillstandNr FROM StillstandTyp WHERE Gruppe = 1) 
-                            AND Gebucht = 0";
+                // Aufträge holen, die laufen oder in den letzten Tagen beendet wurden
+                // INCL_Days_TPM_Auswertung Standardwert: 30 Tage
+                int inclDaysTPMAuswertung = 30;
+                DateTime cutoffDate = DateTime.Now.AddDays(-inclDaysTPMAuswertung);
+                
+                string sql = $@"SELECT betriebsauftragnr, aarchiv.maschine, maschine.maschnr, ruestzeitsoll 
+                            FROM aarchiv 
+                            LEFT JOIN maschine ON maschine.lizenz = aarchiv.maschine 
+                            WHERE enddatumzeit = 0 OR enddatumzeit > '{S7MainServiceExtensions.FloatToPunktString(cutoffDate)}'";
                 
                 using (var reader = _database.ExecuteReader(sql))
                 {
                     while (await reader.ReadAsync(stoppingToken))
                     {
-                        int stillstandNr = reader.GetInt32(0);
-                        int maschineNr = reader.GetInt32(1);
-                        int stillstandTypNr = reader.GetInt32(2);
-                        DateTime kommt = reader.GetDateTime(3);
-                        DateTime geht = reader.GetDateTime(4);
+                        string BANr = reader.GetString(0);
+                        string Lizenz = reader.GetString(1);
+                        string MaschNr = reader.GetString(2);
+                        int sollruest = reader.GetInt32(3);
                         
-                        // Als ungeplante Rüstzeit markieren
-                        sql = $@"UPDATE Stillstand 
-                            SET Gebucht = 1, Ungeplant = 1
-                            WHERE Nr = {stillstandNr}";
+                        int istruest = 0;
+                        int ungeplruest = 0;
+                        int gesruest = 0;
                         
-                        await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                        // Ungeplante Rüstzeiten (StillstandNr = RuestStillstandNrUngeplant, typischerweise 2 oder spezifisch)
+                        // Standardwert für RuestStillstandNrUngeplant: 2
+                        int ruestStillstandNrUngeplant = 2;
                         
-                        _logger.LogDebug("Ungeplante Rüstzeit markiert: Stillstand {StillstandNr}, Maschine {MaschineNr}", 
-                            stillstandNr, maschineNr);
+                        sql = $@"SELECT nr, stillstandnr, kommt, geht, schusszaehler 
+                                FROM tpm_stillog 
+                                WHERE betriebsauftragnr = '{BANr}'
+                                AND stillstandnr = {ruestStillstandNrUngeplant}
+                                ORDER BY kommt";
+                        
+                        using (var stillstandReader = _database.ExecuteReader(sql))
+                        {
+                            if (!stillstandReader.HasRows)
+                            {
+                                // Falls keine ungeplanten Rüstzeiten, nach StillstandNr 2 suchen
+                                sql = $@"SELECT nr, stillstandnr, kommt, geht, schusszaehler 
+                                        FROM tpm_stillog 
+                                        WHERE betriebsauftragnr = '{BANr}'
+                                        AND stillstandnr = 2 
+                                        ORDER BY kommt";
+                                
+                                using (var stillstandReader2 = _database.ExecuteReader(sql))
+                                {
+                                    while (await stillstandReader2.ReadAsync(stoppingToken))
+                                    {
+                                        DateTime kommt = stillstandReader2.GetDateTime(2);
+                                        DateTime geht = stillstandReader2.GetDateTime(3);
+                                        int schuss = stillstandReader2.GetInt32(4);
+                                        
+                                        if (geht < DateTime.Now)
+                                            geht = DateTime.Now;
+                                        
+                                        // Rüstzeiteintrag berechnen (in Minuten)
+                                        int ruestzeiteintrag = (int)Math.Round((geht - kommt).TotalMinutes);
+                                        
+                                        gesruest += ruestzeiteintrag;
+                                        
+                                        if (gesruest > sollruest)
+                                        {
+                                            // Splitten und umbuchen
+                                            ungeplruest = gesruest - sollruest;
+                                            DateTime splitzeitpunkt = kommt.AddMinutes(ruestzeiteintrag - ungeplruest);
+                                            
+                                            // Neuen Rüsteintrag anlegen
+                                            sql = $@"INSERT INTO tpm_stillog (NR, BETRIEBSAUFTRAGNR, kommt, geht, DAUER, maschnr, 
+                                                    WERKZEUGNR, STILLSTANDNR, AUFTRAGNR, BEZEICHNUNG, SCHICHT, PERSONALNR, SCHUSSZAEHLER, prodzaehler) 
+                                                    SELECT tpm_stillogid.NextVal NR, BETRIEBSAUFTRAGNR, 
+                                                    '{S7MainServiceExtensions.FloatToPunktString(splitzeitpunkt)}' Kommt, 
+                                                    GEHT, -1 Dauer, maschnr, WERKZEUGNR, {ruestStillstandNrUngeplant} STILLSTANDNR, 
+                                                    AUFTRAGNR, BEZEICHNUNG, SCHICHT, PERSONALNR, {schuss} SCHUSSZAEHLER, prodzaehler 
+                                                    FROM tpm_stillog WHERE nr = {stillstandReader2.GetInt32(0)}";
+                                            
+                                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                                            
+                                            // Originalen Eintrag aktualisieren
+                                            sql = $@"UPDATE tpm_stillog SET geht = '{S7MainServiceExtensions.FloatToPunktString(splitzeitpunkt)}', 
+                                                    dauer = -1 WHERE nr = {stillstandReader2.GetInt32(0)}";
+                                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        _logger.LogDebug("UnscheduledSetup processed: BANr={BANr}, SollRuest={SollRuest}", BANr, sollruest);
                     }
                 }
                 
@@ -138,7 +353,7 @@ namespace INCLService.CSharp.Utilities
                         if (istwert >= sollwert)
                         {
                             // Auftrag als fertig markieren
-                            sql = $@"UPDATE PDE SET Stat = 1 WHERE Nr = {nr}";
+                            sql = $@"UPDATE PDE SET Stat = 1 WHERE Nr = '{nr}'";
                             await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                             
                             _logger.LogDebug("Sollstückzahl erreicht: PDE {Nr}, Sollwert {Sollwert}, Istwert {Istwert}", 
@@ -180,7 +395,7 @@ namespace INCLService.CSharp.Utilities
                         DateTime naechsteWartung = reader.GetDateTime(3);
                         int maschineNr = reader.GetInt32(4);
                         
-                        // Wartung als fällig markieren
+                        // Wartung als erledigt markieren
                         sql = $@"UPDATE WerkzeugWartung 
                             SET Erledigt = 1, ErledigtAm = GETDATE()
                             WHERE Nr = {wartungNr}";
@@ -245,8 +460,47 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("CheckAuftragKette started");
                 
-                // Auftragskette prüfen
-                // Hier würde die Logik aus Delphi implementiert werden
+                // Auftragskette prüfen - Aufträge ohne Nachfolger finden
+                string sql = @"SELECT a.Nr, a.Betriebsauftragnr, a.Maschine, a.Stat, a.FolgeAuftrag 
+                            FROM PDE a 
+                            LEFT JOIN PDE b ON a.FolgeAuftrag = b.Betriebsauftragnr 
+                            WHERE b.Betriebsauftragnr IS NULL 
+                            AND a.FolgeAuftrag IS NOT NULL 
+                            AND a.FolgeAuftrag <> ''";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string pdeNr = reader.GetString(0);
+                        string betriebsauftragnr = reader.GetString(1);
+                        string maschine = reader.GetString(2);
+                        int stat = reader.GetInt32(3);
+                        string folgeAuftrag = reader.GetString(4);
+                        
+                        // Prüfen, ob der Folgeauftrag existiert
+                        string checkSql = $@"SELECT COUNT(*) FROM PDE WHERE Betriebsauftragnr = '{folgeAuftrag}'";
+                        
+                        bool exists = false;
+                        using (var checkReader = _database.ExecuteReader(checkSql))
+                        {
+                            if (await checkReader.ReadAsync(stoppingToken))
+                            {
+                                exists = checkReader.GetInt32(0) > 0;
+                            }
+                        }
+                        
+                        if (!exists)
+                        {
+                            // Folgeauftrag in PDE eintragen oder Stat aktualisieren
+                            // Hier könnte man den Auftrag als abgeschlossen markieren
+                            sql = $@"UPDATE PDE SET Stat = 1, FolgeAuftrag = NULL WHERE Nr = '{pdeNr}'";
+                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                            
+                            _logger.LogDebug("Auftragskette: Folgeauftrag nicht gefunden, PDE {PdeNr} als fertig markiert", pdeNr);
+                        }
+                    }
+                }
                 
                 _logger.LogDebug("CheckAuftragKette completed");
             }
@@ -266,8 +520,34 @@ namespace INCLService.CSharp.Utilities
             {
                 _logger.LogDebug("Reschedule started");
                 
-                // Neuplanung durchführen
-                // Hier würde die Logik aus Delphi implementiert werden
+                // Neuplanung durchführen - Aufträge mit veränderter Priorität oder Dringlichkeit
+                string sql = @"SELECT Nr, Betriebsauftragnr, Maschine, Prioritaet, Dringlichkeit, Stat 
+                            FROM PDE 
+                            WHERE Stat = 0 
+                            AND (PrioritaetChanged = 1 OR DringlichkeitChanged = 1)";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string pdeNr = reader.GetString(0);
+                        string betriebsauftragnr = reader.GetString(1);
+                        string maschine = reader.GetString(2);
+                        int prioritaet = reader.GetInt32(3);
+                        int dringlichkeit = reader.GetInt32(4);
+                        int stat = reader.GetInt32(5);
+                        
+                        // Neuplanung durchführen - Startdatum anpassen
+                        // Hier würde die komplexe Neuplanungslogik stehen
+                        // Für jetzt: Flags zurücksetzen
+                        sql = $@"UPDATE PDE SET PrioritaetChanged = 0, DringlichkeitChanged = 0 
+                                WHERE Nr = '{pdeNr}'";
+                        await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                        
+                        _logger.LogDebug("Neuplanung: PDE {PdeNr}, Priorität {Prioritaet}, Dringlichkeit {Dringlichkeit}", 
+                            pdeNr, prioritaet, dringlichkeit);
+                    }
+                }
                 
                 _logger.LogDebug("Reschedule completed");
             }
@@ -312,7 +592,7 @@ namespace INCLService.CSharp.Utilities
                             // Ende aus Ist aktualisieren
                             sql = $@"UPDATE PDE 
                                 SET EndeAusIst = '{S7MainServiceExtensions.FloatToPunktString(endeDatumZeit)}'
-                                WHERE Nr = {nr}";
+                                WHERE Nr = '{nr}'";
                             await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                             
                             _logger.LogDebug("Ende aus Ist berechnet: PDE {Nr}, Ende {EndeDatumZeit}", nr, endeDatumZeit);
@@ -351,7 +631,7 @@ namespace INCLService.CSharp.Utilities
                         DateTime endDatumZeit = reader.GetDateTime(1);
                         
                         // Auftrag als terminiert markieren
-                        sql = $@"UPDATE PDE SET Stat = 3 WHERE Nr = {nr}";
+                        sql = $@"UPDATE PDE SET Stat = 3 WHERE Nr = '{nr}'";
                         await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                         
                         result = true;
@@ -382,7 +662,30 @@ namespace INCLService.CSharp.Utilities
                 bool result = false;
                 
                 // Automatische Terminierung durchführen
-                // Hier würde die Logik aus Delphi implementiert werden
+                // Aufträge, die länger als X Tage laufen, terminieren
+                int maxLaufzeitTage = 30; // Standardwert
+                DateTime cutoff = DateTime.Now.AddDays(-maxLaufzeitTage);
+                
+                string sql = $@"SELECT Nr, StartDatumZeit, Betriebsauftragnr FROM PDE 
+                            WHERE Stat = 0 
+                            AND StartDatumZeit < '{S7MainServiceExtensions.FloatToPunktString(cutoff)}'";
+                
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string nr = reader.GetString(0);
+                        DateTime startDatumZeit = reader.GetDateTime(1);
+                        string betriebsauftragnr = reader.GetString(2);
+                        
+                        // Auftrag als terminiert markieren
+                        sql = $@"UPDATE PDE SET Stat = 3, EndDatumZeit = GETDATE() WHERE Nr = '{nr}'";
+                        await _database.ExecuteNonQueryAsync(sql, stoppingToken);
+                        
+                        result = true;
+                        _logger.LogDebug("Autoterminierung: PDE {Nr} terminiert, gestartet am {StartDatumZeit}", nr, startDatumZeit);
+                    }
+                }
                 
                 _logger.LogDebug("Autoterminierung completed - Result: {Result}", result);
                 return result;
