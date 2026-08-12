@@ -83,6 +83,7 @@ namespace INCLService.CSharp.Services
         public bool MengeSchichtBerechnen { get; set; } = false;
         public bool MengeSchichtMinus { get; set; } = false;
         public bool MachineCycleCount { get; set; } = false;
+        public bool METALL_BEARBEITUNG { get; set; } = false;
         
         public S7MainService(
             ILogger<S7MainService> logger,
@@ -218,6 +219,7 @@ namespace INCLService.CSharp.Services
                 MengeSchichtBerechnen = _configuration.GetValue<bool>("Features:MengeSchichtBerechnen", false);
                 MengeSchichtMinus = _configuration.GetValue<bool>("Features:MengeSchichtMinus", false);
                 MachineCycleCount = _configuration.GetValue<bool>("Features:MachineCycleCount", false);
+                METALL_BEARBEITUNG = _configuration.GetValue<bool>("Features:METALL_BEARBEITUNG", false);
                 
                 _logger.LogInformation("S7MainService configuration loaded. MainTimer: {Timer}s, AliveTimer: {AliveTimer}s",
                     _mainTimerInterval, _aliveTimerInterval);
@@ -581,7 +583,7 @@ namespace INCLService.CSharp.Services
             }
         }
 
-        private async Task Timer1TimerAsync(CancellationToken stoppingToken)
+        private async Task Timer1TimerAsync(CancellationToken stoppingToken, S7MainServiceCCC ccc)
         {
             try
             {
@@ -599,6 +601,28 @@ namespace INCLService.CSharp.Services
                     _firstLauf = false;
                     _logger.LogInformation("Erster Lauf abgeschlossen");
                 }
+                
+                // CCC-Funktionen aufrufen
+                if (AuftragAutomatikStart)
+                {
+                    await ccc.CCC_AuftragAutomatikStartAsync(stoppingToken);
+                }
+                await ccc.CCC_AuftragAutomatikStartVariabelAsync(stoppingToken);
+                await ccc.CCC_Check_Auftrag_FreigabeAsync(stoppingToken);
+                await ccc.CCC_Daten_AktualisierenAsync(stoppingToken);
+                await ccc.CCC_CheckUnterbrocheneAuftraegeAsync(stoppingToken);
+                await ccc.CCC_Daten_SchreibenAsync(stoppingToken);
+                await ccc.In_SPSWerteDBAsync(stoppingToken);
+                
+                // Schichtwechsel prüfen
+                int alteSchicht;
+                if (await ccc.NeueSchichtAsync(out alteSchicht, stoppingToken))
+                {
+                    _logger.LogInformation("Schichtwechsel erkannt: Alte Schicht = {AlteSchicht}", alteSchicht);
+                }
+                
+                // Rote Lampe prüfen
+                await ccc.CheckRoteLampeAusAsync(stoppingToken);
                 
                 // Datenbank-Operationen
                 if (_datenEnabled && _database != null && _database.Connected)
@@ -732,6 +756,22 @@ namespace INCLService.CSharp.Services
         {
             _logger.LogInformation("S7MainService stopping...");
             await base.StopAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gibt die S7MainData-Instanz zurück
+        /// </summary>
+        public S7MainData GetS7Data()
+        {
+            return _s7Data;
+        }
+
+        /// <summary>
+        /// Setzt die S7MainData-Instanz
+        /// </summary>
+        public void SetS7Data(S7MainData data)
+        {
+            _s7Data = data;
         }
     }
 }
