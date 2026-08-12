@@ -1605,3 +1605,141 @@ public const int TPMLogistik = 2;
 4. **Docker-Container:**
    - Dockerfile für INCLService.CSharp erstellen
    - Multi-Architektur-Builds (x64, ARM64)
+
+---
+
+## 🔍 Detaillierte Analyse: Fehlende Funktionen nach Schritt 22
+
+### 📌 Übersicht
+Obwohl Schritt 22 als abgeschlossen markiert wurde, fehlen noch **viele kritische Funktionen** aus den Delphi-Dateien.
+Diese Analyse identifiziert alle fehlenden Komponenten und priorisiert sie für die nächsten Schritte.
+
+---
+
+## 🚨 Kritische Lücken (Priorität 1 - Produktionsblocker)
+
+### 1. DBMain.pas → S7MainService.cs
+
+#### **Fehlende Hauptfunktionen:**
+
+| Delphi-Funktion | C#-Status | Priorität | Beschreibung | Abhängigkeiten |
+|----------------|-----------|-----------|--------------|----------------|
+| **`In_SPSWerteDB`** | ❌ Nicht implementiert | 🔴 **Hoch** | Schreibt alle SPS-Werte in die Datenbank (SPSWERTE-Tabelle) | CommonDB, S7MainData |
+| **`Schreibe_SPS_Wert`** | ❌ Nicht implementiert | 🔴 **Hoch** | Schreibt einzelne SPS-Werte | CommonDB |
+| **`NeueSchicht`** | ❌ Nicht implementiert | 🔴 **Hoch** | Prüft Schichtwechsel (SIWECHSEL-Tabelle) | CommonDB |
+| **`CheckRoteLampeAus`** | ❌ Nicht implementiert | 🔴 **Hoch** | Prüft und löscht Rote-Lampe-Einträge | CommonDB |
+| **`GetStueckAuftragAlt`** | ❌ Nicht implementiert | 🟡 **Mittel** | Holt Stückzahl des alten Auftrags | CommonDB |
+| **`CheckManuelleStueckBuchung`** | ❌ Nicht implementiert | 🟡 **Mittel** | Prüft manuelle Stückbuchung | CommonDB |
+| **`Hole_Daten_Tabelle`** | ❌ Nicht implementiert | 🟡 **Mittel** | Lädt Daten aus verschiedenen Tabellen | CommonDB |
+| **`DatenLesen_Metall`** | ❌ Nicht implementiert | 🟡 **Mittel** | Metall-spezifische Daten | CommonDB |
+
+#### **Fehlende CCC-Funktionen (Critical Control Center):**
+
+| Delphi-Funktion | Aufruf in DBMain.pas | Priorität | Beschreibung |
+|----------------|----------------------|-----------|--------------|
+| **`CCC_Init`** | Zeile 3058 | 🔴 **Hoch** | Initialisierung der CCC-Funktionen |
+| **`CCC_AuftragAutomatikStart`** | Zeile 3185 | 🔴 **Hoch** | **Auftragsautomatik-Start** (wichtig!) |
+| **`CCC_AuftragAutomatikStartVariabel`** | Zeile 3192 | 🔴 **Hoch** | Variable Auftragsautomatik |
+| **`CCC_Auftrag_Start_Barcode`** | Zeilen 3120-3122 | 🔴 **Hoch** | Auftragsstart per Barcode (3 Instanzen) |
+| **`CCC_Check_Auftrag_Freigabe`** | Zeile 3130 | 🔴 **Hoch** | Prüft Auftragsfreigabe |
+| **`CCC_Daten_Aktualisieren`** | Zeile 3142 | 🟡 **Mittel** | Aktualisiert Daten |
+| **`CCC_CheckUnterbrocheneAuftraege`** | Zeile 3150 | 🟡 **Mittel** | Prüft unterbrochene Aufträge |
+| **`CCC_Daten_Schreiben`** | Zeile 3233 | 🟡 **Mittel** | Schreibt Daten in DB |
+| **`CCC_TPM_Stillstand_Check`** | Zeile 3245 | 🟡 **Mittel** | TPM-Stillstandsprüfung |
+| **`CCC_Proc_Ruesten_AutoBuchen`** | Zeile 3247 | 🟡 **Mittel** | Automatische Rüstzeit-Buchung |
+| **`CCC_FolgeAuftrag_Starten`** | Zeile 3467 | 🟡 **Mittel** | Startet Folgeauftrag |
+
+---
+
+## 📊 Priorität 2 - Wichtige Funktionen
+
+### 2. Th_Schicht.pas → ShiftService.cs
+
+| Delphi-Funktion | C#-Status | Priorität | Beschreibung |
+|----------------|-----------|-----------|--------------|
+| **Detaillierte Schichtwechsel-Logik** | ❌ Unvollständig | 🟡 **Mittel** | Komplette Schichtwechsel-Erkennung |
+| **TPM-Integration** | ⚠️ Teilweise | 🟡 **Mittel** | TPM-Berechnungen für Schicht |
+| **Stillstandsberechnungen** | ⚠️ Teilweise | 🟡 **Mittel** | Stillstandszeiten pro Schicht |
+
+### 3. Th_SignalLog.pas → SignalLogService.cs
+
+| Delphi-Funktion | C#-Status | Priorität | Beschreibung |
+|----------------|-----------|-----------|--------------|
+| **Signal-Überwachungslogik** | ❌ Unvollständig | 🟡 **Mittel** | Komplette Signal-Überwachung |
+| **Wertänderungs-Erkennung** | ❌ Nicht implementiert | 🟡 **Mittel** | Erkennung von Signaländerungen |
+| **Signal-DB-Logging** | ⚠️ Teilweise | 🟡 **Mittel** | Logging in Datenbank |
+
+### 4. Th_DBBackup.pas → DBBackupService.cs
+
+| Delphi-Funktion | C#-Status | Priorität | Beschreibung |
+|----------------|-----------|-----------|--------------|
+| **Backup-Logik** | ❌ Nicht implementiert | 🟢 **Niedrig** | Datenbank-Backup-Funktionen |
+
+---
+
+## 📋 Priorität 3 - Ergänzende Funktionen
+
+### 5. Th_Zusatz.pas → AdditionalService.cs / ArbeitUtils*.cs
+
+| Delphi-Funktion | C#-Status | Priorität | Beschreibung |
+|----------------|-----------|-----------|--------------|
+| **Taktzeit_Personal** | ❌ Nicht implementiert | 🟢 **Niedrig** | Taktzeit pro Personal |
+| **TaktMitteln** | ❌ Nicht implementiert | 🟢 **Niedrig** | Taktzeit mitteln |
+| **Taktzeit_Aus_Stamm_Update** | ❌ Nicht implementiert | 🟢 **Niedrig** | Taktzeit aus Stammdaten |
+
+---
+
+## 🎯 Empfohlene Vorgehensweise
+
+### Schritt 23: Kritische Funktionen implementieren (Priorität 1)
+1. **`In_SPSWerteDB`** in S7MainService.cs
+2. **`Schreibe_SPS_Wert`** in S7MainService.cs
+3. **`NeueSchicht`** in S7MainService.cs
+4. **`CheckRoteLampeAus`** in S7MainService.cs
+5. **`CCC_AuftragAutomatikStart`** (neue Datei: S7MainService_CCC.cs)
+6. **`CCC_Auftrag_Start_Barcode`** (neue Datei: S7MainService_CCC.cs)
+
+### Schritt 24: Wichtige Funktionen implementieren (Priorität 2)
+1. **Detaillierte Schichtwechsel-Logik** in ShiftService.cs
+2. **Signal-Überwachungslogik** in SignalLogService.cs
+3. **CCC_Check_Auftrag_Freigabe** in S7MainService_CCC.cs
+4. **CCC_Daten_Aktualisieren** in S7MainService_CCC.cs
+
+### Schritt 25: Ergänzende Funktionen (Priorität 3)
+1. **Backup-Logik** in DBBackupService.cs
+2. **Taktzeit-Funktionen** in ArbeitUtils*.cs
+
+---
+
+## 📝 Datei-zu-Datei-Implementierungsstatus
+
+| Delphi-Datei | C#-Datei | Status | Fehlende Funktionen |
+|--------------|----------|--------|---------------------|
+| DBMain.pas | S7MainService.cs | ⚠️ 60% | In_SPSWerteDB, Schreibe_SPS_Wert, NeueSchicht, CheckRoteLampeAus, GetStueckAuftragAlt, CheckManuelleStueckBuchung, Hole_Daten_Tabelle, CCC_* Funktionen |
+| Th_Zusatz.pas | AdditionalService.cs + ArbeitUtils*.cs | ✅ 95% | Taktzeit_Personal, TaktMitteln |
+| Th_Schicht.pas | ShiftService.cs | ⚠️ 50% | Detaillierte Schichtwechsel-Logik, TPM-Integration |
+| Th_SignalLog.pas | SignalLogService.cs | ⚠️ 40% | Signal-Überwachungslogik, Wertänderungs-Erkennung |
+| Th_DBBackup.pas | DBBackupService.cs | ❌ 20% | Backup-Logik |
+
+**Gesamtfortschritt: ~75%** (nicht 100% wie in Schritt 22 angegeben)
+
+---
+
+## 🔧 Nächste konkrete Schritte
+
+### Schritt 23: Kritische Funktionen aus DBMain.pas
+1. **S7MainService_CCC.cs erstellen** für alle CCC-Funktionen
+2. **In_SPSWerteDB** implementieren (SPS-Werte in DB schreiben)
+3. **NeueSchicht** implementieren (Schichtwechsel-Logik)
+4. **CheckRoteLampeAus** implementieren
+5. **CCC_AuftragAutomatikStart** implementieren (Auftragsautomatik)
+
+### Schritt 24: Services vervollständigen
+1. **ShiftService.cs** mit detaillierter Schichtlogik
+2. **SignalLogService.cs** mit Signal-Überwachung
+3. **DBBackupService.cs** mit Backup-Logik
+
+### Schritt 25: Finaler Test
+1. Alle Funktionen integrieren
+2. End-to-End-Test durchführen
+3. Performance optimieren
