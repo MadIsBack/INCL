@@ -72,9 +72,7 @@ namespace INCLService.CSharp
                         services.AddHostedService<ShiftService>();
                         services.AddHostedService<DBBackupService>();
                         services.AddHostedService<SignalLogService>();
-                        // AdditionalService benoetigt die noch nicht vollstaendig portierten
-                        // ArbeitUtils_ThZusatz*-Klassen und wird daher temporaer nicht registriert.
-                        // services.AddHostedService<AdditionalService>();
+                        services.AddHostedService<AdditionalService>();
                         
                         // DatenService als Singleton registrieren (wird von mehreren Services genutzt)
                         services.AddSingleton<DatenService>();

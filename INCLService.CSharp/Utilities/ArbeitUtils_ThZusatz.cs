@@ -475,5 +475,79 @@ namespace INCLService.CSharp.Utilities
                 _logger.LogError(ex, "Error in Laufzeit_Berechnen_With_Betriebsart");
             }
         }
+
+        /// <summary>
+        /// Setzt die Status-Beschreibung fuer alle Auftraege in PDE.
+        /// Aequivalent zu TThread_Zusatz.Status_Beschreibung in Th_Zusatz.pas (Zeile 3192).
+        /// </summary>
+        public async Task Status_BeschreibungAsync(CancellationToken stoppingToken)
+        {
+            try
+            {
+                _logger.LogDebug("Status_Beschreibung started");
+
+                string sql = "SELECT Nr, Stat, Status, Festdatum, Optimiert, Mustern FROM PDE";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        int nr = reader.GetInt32("Nr");
+                        int stat = reader.GetInt32("Stat");
+                        int festDatum = reader.GetInt32("Festdatum");
+                        int optimiert = reader.GetInt32("Optimiert");
+                        int mustern = reader.GetInt32("Mustern");
+
+                        string st = string.Empty;
+                        switch (stat)
+                        {
+                            case 0:
+                                if (mustern == 1)
+                                    st = ArbeitUtils.GetL("Mustern");
+                                else
+                                {
+                                    switch (optimiert)
+                                    {
+                                        case 0: st = ArbeitUtils.GetL("laeuft"); break;
+                                        case 1: st = ArbeitUtils.GetL("optimiert"); break;
+                                    }
+                                }
+                                break;
+                            case 1:
+                                st = ArbeitUtils.GetL("ruesten");
+                                break;
+                            case 2:
+                                st = festDatum == 0
+                                    ? ArbeitUtils.GetL("geplant")
+                                    : ArbeitUtils.GetL("gepl./fest.");
+                                break;
+                            case 3:
+                                st = festDatum == 0
+                                    ? ArbeitUtils.GetL("terminiert")
+                                    : ArbeitUtils.GetL("term./fest.");
+                                break;
+                            case 4:
+                                st = festDatum == 0
+                                    ? ArbeitUtils.GetL("Wartung")
+                                    : ArbeitUtils.GetL("Wartung/fest.");
+                                break;
+                            case 5:
+                                st = festDatum == 0
+                                    ? ArbeitUtils.GetL("unterbrochen")
+                                    : ArbeitUtils.GetL("unterbr./fest.");
+                                break;
+                        }
+
+                        string updateSql = "UPDATE PDE SET Status = '" + st.Replace("'", "''") + "' WHERE Nr = " + nr;
+                        await _database.ExecuteNonQueryAsync(updateSql, stoppingToken);
+                    }
+                }
+
+                _logger.LogDebug("Status_Beschreibung completed");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in Status_Beschreibung");
+            }
+        }
     }
 }

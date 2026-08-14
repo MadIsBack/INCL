@@ -410,7 +410,7 @@ namespace INCLService.CSharp.Utilities
                         {
                             sql = $@"INSERT INTO Stillstand (MaschineNr, StillstandNr, Kommt, Geht, Gebucht, Grund) 
                                 VALUES ((SELECT Nr FROM Maschinen WHERE Lizenz = '{lizenz}'), 
-                                        100, GETDATE(), DATEADD(hour, 1, GETDATE()), 1, 'Werkzeugwartung {Werkzeug}')";
+                                        100, GETDATE(), DATEADD(hour, 1, GETDATE()), 1, 'Werkzeugwartung {werkzeug}')";
                             await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                         }
                         
