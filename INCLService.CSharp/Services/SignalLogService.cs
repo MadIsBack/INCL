@@ -281,7 +281,7 @@ namespace INCLService.CSharp.Services
                 if (logNr > 0)
                 {
                     // Offenen Eintrag aktualisieren
-                    string sql = $"UPDATE SIGNALLOG SET Ende = GETDATE(), Dauer = DATEDIFF(SECOND, Start, GETDATE()), 
+                    string sql = $@"UPDATE SIGNALLOG SET Ende = GETDATE(), Dauer = DATEDIFF(SECOND, Start, GETDATE()), 
                         Wert = '{newValue}' WHERE Nr = {logNr}";
                     await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                     
@@ -290,7 +290,7 @@ namespace INCLService.CSharp.Services
                 else
                 {
                     // Neuen Eintrag erstellen
-                    string sql = $"INSERT INTO SIGNALLOG (Nr, SignalNr, MaschNr, Start, Ende, Wert, Dauer) 
+                    string sql = $@"INSERT INTO SIGNALLOG (Nr, SignalNr, MaschNr, Start, Ende, Wert, Dauer) 
                         VALUES (SIGNALLOGID.NextVal, {entry.SignalNr}, {entry.MaschNr}, GETDATE(), GETDATE(), 
                         '{newValue}', 0)";
                     await _database.ExecuteNonQueryAsync(sql, stoppingToken);

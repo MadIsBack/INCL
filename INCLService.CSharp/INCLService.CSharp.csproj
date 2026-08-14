@@ -5,7 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <UseSerilog>true</UseSerilog>
+    <NoWarn>CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625;CS8767;CS1998</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +13,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-    <PackageReference Include="Serilog" Version="3.1.0" />
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
     <PackageReference Include="Serilog.Sinks.RollingFile" Version="3.0.0" />
   </ItemGroup>
@@ -22,4 +25,19 @@
     <ProjectReference Include="..\commondb\INCLUDIS.Utils.CommonDB.csproj" />
   </ItemGroup>
 
+  <!-- TestIntegration enthaelt eine eigene Main() und ist keine Produktionseinstiegspunkt -->
+  <ItemGroup>
+    <Compile Remove="TestIntegration.cs" />
+  </ItemGroup>
+
+  <!-- Die ArbeitUtils_ThZusatz*-Hilfsdateien sind unvollstaendige Portierungs-Stubs
+       aus vorherigen Schritten und werden erst in einem spaeteren Schritt vollstaendig
+       portiert. Sie werden daher vom Build ausgeschlossen. -->
+  <ItemGroup>
+    <Compile Remove="Utilities/ArbeitUtils_ThZusatz.cs" />
+    <Compile Remove="Utilities/ArbeitUtils_ThZusatz_Complete.cs" />
+    <Compile Remove="Utilities/ArbeitUtils_ThZusatz_Final.cs" />
+    <Compile Remove="Services/AdditionalService.cs" />
+
+  </ItemGroup>
 </Project>

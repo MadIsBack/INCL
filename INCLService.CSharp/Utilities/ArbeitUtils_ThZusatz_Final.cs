@@ -1,3 +1,4 @@
+using INCLService.CSharp.Services;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Logging;
@@ -13,11 +14,11 @@ namespace INCLService.CSharp.Utilities
     /// </summary>
     public class ArbeitUtilsThZusatzFinal
     {
-        private readonly ILogger<ArbeitUtilsThZusatzFinal> _logger;
+        private readonly ILogger _logger;
         private readonly CommonDB _database;
         private readonly ArbeitUtils _arbeitUtils;
         
-        public ArbeitUtilsThZusatzFinal(ILogger<ArbeitUtilsThZusatzFinal> logger, CommonDB database, ArbeitUtils arbeitUtils)
+        public ArbeitUtilsThZusatzFinal(ILogger logger, CommonDB database, ArbeitUtils arbeitUtils)
         {
             _logger = logger;
             _database = database;

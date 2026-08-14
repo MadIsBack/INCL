@@ -1,6 +1,7 @@
 using INCLService.CSharp.Models;
 using INCLService.CSharp.Utilities;
 using INCLUDIS.Utils.CommonDB;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -15,35 +16,714 @@ namespace INCLService.CSharp.Services
     /// </summary>
     public class S7MainServiceCCC
     {
-        private readonly ILogger<S7MainServiceCCC> _logger;
+        private readonly ILogger _logger;
         private readonly CommonDB _database;
         private readonly S7MainService _s7MainService;
         private readonly S7MainData _s7Data;
+        private readonly IConfiguration _configuration;
 
-        public S7MainServiceCCC(ILogger<S7MainServiceCCC> logger, CommonDB database, S7MainService s7MainService)
+        // Feature-Flags (vgl. Delphi-Globalvariablen, hier aus appsettings.json geladen).
+        // Werden von CCC_Init und abgeleiteten CCC_*-Funktionen ausgewertet.
+        public bool AuftragstartBarcode { get; set; } = false;
+        public bool VerpacktBarcode { get; set; } = false;
+        public bool BlockStillstand { get; set; } = false;
+        public bool AuftragBlock { get; set; } = false;
+        public bool BypassMode { get; set; } = false;
+        public bool KavitaetFromSPS { get; set; } = false;
+        public bool Kavitaet_laufender_Auftrag2 { get; set; } = false;
+        public bool Kavitaet_laufender_Auftrag3 { get; set; } = false;
+        public bool Werkzeugverwaltung { get; set; } = false;
+        public bool Halbautomatik { get; set; } = false;
+        public bool HochlaufTPM { get; set; } = false;
+
+        public S7MainServiceCCC(ILogger logger, CommonDB database, S7MainService s7MainService, IConfiguration configuration = null)
         {
             _logger = logger;
             _database = database;
             _s7MainService = s7MainService;
-            _s7Data = s7MainService.GetS7Data();
+            _configuration = configuration;
+            _s7Data = s7MainService?.GetS7Data() ?? new S7MainData();
+            LoadConfiguration();
         }
 
         /// <summary>
-        /// Initialisierung der CCC-Funktionen
-        /// Äquivalent zu CCC_Init in DBMain.pas (Zeile 3058)
+        /// Laedt die Feature-Flags aus der Konfiguration (appsettings.json).
+        /// Entspricht dem Einlesen der INI-/Registry-Werte im Delphi-Dienst.
+        /// </summary>
+        private void LoadConfiguration()
+        {
+            if (_configuration == null)
+                return;
+
+            AuftragstartBarcode = _configuration.GetValue<bool>("Features:AuftragstartBarcode", false);
+            VerpacktBarcode = _configuration.GetValue<bool>("Features:VerpacktBarcode", false);
+            BlockStillstand = _configuration.GetValue<bool>("Features:BlockStillstand", false);
+            AuftragBlock = _configuration.GetValue<bool>("Features:AuftragBlock", false);
+            BypassMode = _configuration.GetValue<bool>("Features:BypassMode", false);
+            KavitaetFromSPS = _configuration.GetValue<bool>("Features:KavitaetFromSPS", false);
+            Kavitaet_laufender_Auftrag2 = _configuration.GetValue<bool>("Features:Kavitaet_laufender_Auftrag2", false);
+            Kavitaet_laufender_Auftrag3 = _configuration.GetValue<bool>("Features:Kavitaet_laufender_Auftrag3", false);
+            Werkzeugverwaltung = _configuration.GetValue<bool>("Features:Werkzeugverwaltung", false);
+            Halbautomatik = _configuration.GetValue<bool>("Features:Halbautomatik", false);
+            HochlaufTPM = _configuration.GetValue<bool>("Features:HochlaufTPM", false);
+        }
+
+        /// <summary>
+        /// Status-Konstante für geplante Aufträge.
+        /// Entspricht der Delphi-Konstante stgeplantInt aus comtas_h.pas (= 2).
+        /// </summary>
+        private const short StGeplantInt = 2;
+
+        /// <summary>
+        /// Liest einen booleschen Setup-Parameter aus der Tabelle 'Setup'.
+        /// Entspricht TCO_Setup.GetParamBool in Delphi. Die Spalte 'Wert' wird
+        /// ausgewertet (1 = true).
+        /// </summary>
+        private async Task<bool> GetSetupParamBoolAsync(string paramName, CancellationToken stoppingToken)
+        {
+            try
+            {
+                string sql = $"SELECT Wert FROM Setup WHERE Schluessel = '{paramName}'";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    if (await reader.ReadAsync(stoppingToken))
+                    {
+                        object val = reader.IsDBNull(0) ? null : reader[0];
+                        return val != null && val.ToString() == "1";
+                    }
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GetSetupParamBool: Fehler beim Lesen von {Param}", paramName);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Liefert die Maschinennummer (Datenblock) als Integer anhand einer Lizenz.
+        /// Entspricht CCC_GetMaschNrLizenz aus arbeit.pas (Rückgabewert als int).
+        /// </summary>
+        private int CCC_GetMaschNrLizenzAsInt(string lizenz)
+        {
+            if (string.IsNullOrEmpty(lizenz))
+                return 0;
+            for (int j = 0; j < _s7Data.Includis.Count; j++)
+            {
+                if (_s7Data.Includis[j].Lizenz.Equals(lizenz, StringComparison.OrdinalIgnoreCase))
+                    return j + 1; // 1-basiert wie Includis[Index] in Delphi
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Liefert die Werkzeugnummer anhand eines Werkzeug-Schlüssels.
+        /// Entspricht CCC_GetWerkzeugNr aus arbeit.pas.
+        /// </summary>
+        private string CCC_GetWerkzeugNr(int schluessel)
+        {
+            if (schluessel <= 0)
+                return string.Empty;
+            try
+            {
+                string sql = $"SELECT WerkzeugNr FROM Werkzeug WHERE Nr = {schluessel}";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    if (reader.Read())
+                    {
+                        return reader.GetString(0);
+                    }
+                }
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "CCC_GetWerkzeugNr: Fehler beim Lesen des Werkzeugs {Schluessel}", schluessel);
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Initialisierung der CCC-Funktionen.
+        /// Portiert CCC_Init aus arbeit.pas (Zeile 438). Lädt die Maschinen-Stammdaten
+        /// aus der Tabelle 'Maschine' in die Includis-Liste, anschließend die
+        /// Schichtlaufzeiten, die aktuellen Aufträge (PDE), die BDE-Daten (MDE),
+        /// die Taktoption- sowie die TPM-Stillstandsdefinitionen.
         /// </summary>
         public async Task CCC_InitAsync(CancellationToken stoppingToken)
         {
             try
             {
                 _logger.LogInformation("CCC_Init: Initialisierung der Critical Control Center Funktionen");
-                
-                // Hier würden Initialisierungsroutinen aus Delphi portiert werden
-                // z.B. SystemID schreiben, Lizenzen prüfen, etc.
+
+                // SystemID schreiben und Lizenzen prüfen (wie im Delphi-Hochlauf)
                 await CCC_SchreibeSystemIDAsync(stoppingToken);
                 await CCC_CheckLicensesAsync(stoppingToken);
-                
-                _logger.LogInformation("CCC_Init: Initialisierung abgeschlossen");
+
+                // -----------------------------------------------------------------
+                // 1) Maschinen-Stammdaten aus Tabelle 'Maschine' laden (Includis[])
+                // -----------------------------------------------------------------
+                _s7Data.Includis.Clear();
+                string sql = "SELECT * FROM Maschine ORDER BY Datenblock";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        if (_s7Data.Includis.Count >= _s7Data.AnzahlMasch && _s7Data.AnzahlMasch > 0)
+                            break;
+
+                        var m = new MaschinenDaten
+                        {
+                            IstArchiviert = (reader.GetString("oeerelevant") != "1")
+                                        || (reader.GetString("archiviert") == "1"),
+                            Lizenz = reader.GetString("Lizenz"),
+                            Maschine = reader.GetString("Kennung"),
+                            KURZKENNUNG = reader.GetString("KURZKENNUNG"),
+                            MaschNr = reader.GetInt32("Datenblock").ToString(),
+                            MaschNrEcht = reader.GetInt32("Maschnr").ToString(),
+                            SORT_MASCHPANEL = reader.GetInt32("SORT_MASCHPANEL"),
+                            AutoRuesten = reader.GetInt32("Autoruesten") == 1,
+                            MaschAktiv = reader.GetInt32("MaschAktiv") != 0,
+                            Datenblock = reader.GetInt32("Datenblock"),
+                            Packgroesse = ArbeitUtils.Format_String(reader.GetString("Packgroesse")),
+                            Masch_Warmtrennen = reader.GetInt32("Warmtrennen") != 0,
+                            Prod_Gleich_Pack = reader.GetInt32("Prod_Gleich_Pack") != 0,
+                            ZyklusLast = reader.GetInt32("zyklenlast"),
+                            ZyklusLastZeitpunkt = reader.GetDouble("zyklastdatumzeit"),
+                            ZyklenAll = reader.GetInt32("zyklenall"),
+                            MaschinenTyp = reader.GetInt32("manuelle_buchung")
+                        };
+
+                        if (AuftragstartBarcode)
+                            m.InventarNr = ArbeitUtils.Format_String(reader.GetString("InventarNr"));
+                        else
+                            m.InventarNr = _s7Data.Includis.Count + 1;
+
+                        try
+                        {
+                            m.GutVonBus = reader.GetInt32("gut_von_bus") == 1;
+                            m.KombiSeparat = reader.GetInt32("kombi_separat") == 1;
+                        }
+                        catch
+                        {
+                            // Felder optional - ignoriert bei Fehlern
+                        }
+
+                        if (VerpacktBarcode)
+                            m.Packgroesse = 1;
+
+                        m.SpannzeitToleranz = reader.GetInt32("spannzeittol");
+                        m.Auftrag.Stat = -1;
+                        m.Auftrag.Schwesterauftrag = string.Empty;
+                        m.Auftrag.Form = string.Empty;
+
+                        m.Kopfgroesse = ArbeitUtils.Format_String(reader.GetString("Kopfgroesse"));
+                        if (m.Kopfgroesse < 1)
+                            m.Kopfgroesse = 1;
+                        if (m.Packgroesse < 1)
+                            m.Packgroesse = 1;
+
+                        // Prüfstation aus Feld 'Station' ableiten (einfach/zweifach/dreifach)
+                        string station = reader.GetString("Station");
+                        m.Pruefstation = 1;
+                        if (string.IsNullOrEmpty(station))
+                            m.Pruefstation = 1;
+                        else if (station == ArbeitUtils.GetL("einfach"))
+                            m.Pruefstation = 1;
+                        else if (station == ArbeitUtils.GetL("zweifach"))
+                            m.Pruefstation = 2;
+                        else if (station == ArbeitUtils.GetL("dreifach"))
+                            m.Pruefstation = 3;
+
+                        // Blockstillstand ermitteln (nur wenn einer der Schalter sitzt)
+                        try
+                        {
+                            m.Maschine_geblockt = false;
+                            if (BlockStillstand || AuftragBlock)
+                            {
+                                string blockSql = "SELECT tpm_stillstaende.stillstand, tpm_stillstaende.StillstandNr,"
+                                    + " tpm_stillstaende.geplant, tpm_stillstaende.Gruppe, tpm_stillstaende.BLOCKSTILLSTAND"
+                                    + " FROM tpm_stillstaende,"
+                                    + " tpm_stillog WHERE tpm_stillstaende.StillstandNr = tpm_stillog.StillstandNr AND geht=0"
+                                    + " AND tpm_stillog.Nr = (SELECT max(nr) FROM tpm_stillog WHERE maschnr = '" + m.MaschNr + "')";
+                                using (var blockReader = _database.ExecuteReader(blockSql))
+                                {
+                                    if (await blockReader.ReadAsync(stoppingToken))
+                                    {
+                                        m.Maschine_geblockt = blockReader.GetInt32("BLOCKSTILLSTAND") == 1;
+                                    }
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            m.Maschine_geblockt = false;
+                        }
+
+                        m.StueckzahlDirekt = reader.GetInt32("stueckzahldirekt") == 1;
+
+                        if (BypassMode)
+                            m.Maschine_geblockt = reader.GetInt32("bypass") == 1;
+
+                        _s7Data.Includis.Add(m);
+                    }
+                }
+
+                if (_s7Data.AnzahlMasch == 0)
+                    _s7Data.AnzahlMasch = _s7Data.Includis.Count;
+
+                // -----------------------------------------------------------------
+                // 2) Auftragsfelder aller Maschinen zurücksetzen
+                // -----------------------------------------------------------------
+                foreach (var m in _s7Data.Includis)
+                {
+                    m.Auftrag.AuftragNr = string.Empty;
+                    m.Auftrag.Schwesterauftrag = string.Empty;
+                    m.Auftrag.Form = string.Empty;
+                    m.Auftrag.Werkzeug = 0;
+                    m.Auftrag.WerkzeugNr = string.Empty;
+                    m.Auftrag.EndeDatum = DateTime.MinValue;
+                }
+
+                // -----------------------------------------------------------------
+                // 3) Schichtlaufzeiten je Betriebsauftrag laden (tpm_schicht)
+                // -----------------------------------------------------------------
+                sql = "SELECT SUM(a_istlaufzeit) laufzeit, maschnr, BETRIEBSAUFTRAGNR"
+                    + " FROM tpm_schicht WHERE betriebsauftragnr IN"
+                    + " (SELECT betriebsauftragnr FROM pde WHERE stat = 0)"
+                    + " GROUP BY maschnr, BETRIEBSAUFTRAGNR";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        int i = reader.GetInt32("maschnr");
+                        if (i > 0 && i <= _s7Data.Includis.Count)
+                        {
+                            _s7Data.Includis[i - 1].Auftrag.GesamtLaufzeit = reader.GetInt32("laufzeit");
+                            _s7Data.Includis[i - 1].Auftrag.BaNrLaufzeit = reader.GetString("betriebsauftragnr");
+                        }
+                    }
+                }
+
+                // -----------------------------------------------------------------
+                // 4) Aufräum-Updates auf PDE/MaschInf (Kopfgroesse/Kavitaet >= 1)
+                // -----------------------------------------------------------------
+                await _database.ExecuteNonQueryAsync("UPDATE pde SET kopfgroesse=1 WHERE kopfgroesse=0", stoppingToken);
+                await _database.ExecuteNonQueryAsync("UPDATE maschinf SET kavitaet=1 WHERE kavitaet=0", stoppingToken);
+
+                // -----------------------------------------------------------------
+                // 5) Aktuelle Aufträge (PDE) laden und Maschinen zuordnen
+                // -----------------------------------------------------------------
+                sql = "SELECT CASE WHEN m.maschnr IS NULL THEN mo.maschnr ELSE m.maschnr END maschnr, p.* FROM PDE p"
+                    + " LEFT JOIN maschoffline mo ON mo.lizenz = p.lizenz"
+                    + " LEFT JOIN maschine m ON m.lizenz = p.lizenz"
+                    + " WHERE p.stat IN (0, 1)";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string wert = reader.GetString("Lizenz");
+                        int machNo = reader.GetInt32("maschnr");
+
+                        // Maschine anhand maschnr (Datenblock) bzw. Lizenz finden
+                        int i = -1;
+                        if (machNo > 0 && machNo <= _s7Data.Includis.Count
+                            && _s7Data.Includis[machNo - 1].Lizenz.Equals(wert, StringComparison.OrdinalIgnoreCase))
+                        {
+                            i = machNo - 1;
+                        }
+                        if (i < 0)
+                        {
+                            for (int j = 0; j < _s7Data.Includis.Count; j++)
+                            {
+                                if (_s7Data.Includis[j].Lizenz.Equals(wert, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    i = j;
+                                    break;
+                                }
+                            }
+                        }
+                        if (i < 0)
+                            continue;
+
+                        var m = _s7Data.Includis[i];
+                        var a = m.Auftrag;
+
+                        m.MusternAktiv = reader.GetInt32("Mustern") == 1;
+                        a.Mustern = reader.GetInt32("Mustern") == 1;
+                        a.WasReset = false;
+                        a.BetriebsauftragNr = reader.GetString("BetriebsAuftragNr");
+                        a.AuftragNr = reader.GetString("AuftragNr");
+                        a.Bezeichnung = reader.GetString("Bezeichnung");
+                        a.Zustaendig = reader.GetString("Zustaendig");
+                        a.Signal = reader.GetString("Signal");
+
+                        a.Sollwert = ArbeitUtils.Format_String(reader.GetString("Sollwert"));
+                        a.SollwertOffset = ArbeitUtils.Format_String(reader.GetString("SollwertOffset"));
+                        a.Planzykluszeit = reader.GetInt32("planzykluszeit");
+                        a.Ausschussquote = reader.GetInt32("ausschussquote");
+                        a.SollSpannzeitStk = reader.GetInt32("SOLLSPANNZEITSTK");
+                        a.SollSpannzeitGes = reader.GetInt32("SOLLSPANNZEITGES");
+
+                        try { m.Solltakt = reader.GetInt32("Taktzeit"); }
+                        catch { /* Feld optional */ }
+
+                        a.StueckSchicht = reader.GetInt32("StueckSchicht");
+                        a.PersonalZeit = ArbeitUtils.GFloat(reader.GetString("Personalzeit"));
+                        a.Optimiert = reader.GetInt32("optimiert");
+                        a.OptimiertAktuell = reader.GetInt32("tmpschuss");
+                        a.ImStatusOptimieren = reader.GetInt32("InPause");
+
+                        if (HochlaufTPM)
+                            m.StueckAuftragGesamt = ArbeitUtils.Format_String(reader.GetString("Istwert"));
+
+                        a.Schwesterauftrag = reader.GetString("Schwesterauftrag");
+                        a.Form = reader.GetString("Form");
+                        a.Ausschuss = reader.GetInt32("Ausschuss");
+                        a.Verpackt = ArbeitUtils.Format_String(reader.GetString("Pack"));
+                        a.Vorwarnung = ArbeitUtils.Format_String(reader.GetString("Vorwarnung"));
+
+                        // Halbautomatik
+                        if (reader.GetString("Betriebsart") == ArbeitUtils.GetL("Halbautomatik") && Halbautomatik)
+                            a.HalbAuto = true;
+                        else
+                            a.HalbAuto = false;
+
+                        if (reader.GetString("Erzeugt") == "1")
+                        {
+                            a.Erzeugt = true;
+                            a.VorwarnungErzeugt = true;
+                        }
+                        else
+                        {
+                            a.Erzeugt = false;
+                            a.VorwarnungErzeugt = false;
+                        }
+
+                        a.Solltakt = reader.GetInt32("Taktzeit");
+                        a.Stat = reader.GetInt16("stat");
+                        a.ProgrammNr = reader.GetInt32("Programm_Nr");
+                        a.StartDatum = DateTime.FromOADate(ArbeitUtils.GFloat(reader.GetString("StartdatumZeit")));
+                        a.EndeDatum = DateTime.FromOADate(ArbeitUtils.GFloat(reader.GetString("EnddatumZeit")));
+                        a.EndeDatumSTR = reader.GetString("EndDatumSTR");
+                        a.LTSOLL = ArbeitUtils.GFloat(reader.GetString("LTDatumZeit"));
+                        a.LTIST = ArbeitUtils.GFloat(reader.GetString("EnddatumZeit"));
+                        a.LT1 = ArbeitUtils.GFloat(reader.GetString("Termin1"));
+                        a.LT2 = ArbeitUtils.GFloat(reader.GetString("Termin2"));
+                        a.Kunde = reader.GetString("Kunde");
+                        a.Werkzeug = reader.GetInt32("Werkzeug");
+
+                        try
+                        {
+                            a.Packgroesse = ArbeitUtils.Format_String(reader.GetString("PACKGROESSE"));
+                            a.PALETTENGROESSE = ArbeitUtils.Format_String(reader.GetString("EndDatumSTR"));
+                        }
+                        catch
+                        {
+                            a.Packgroesse = 0;
+                            a.PALETTENGROESSE = 0;
+                        }
+
+                        a.MasterAuftrag = reader.GetInt32("Masterauftrag") == 1;
+
+                        if (Werkzeugverwaltung)
+                            a.WerkzeugNr = CCC_GetWerkzeugNr(a.Werkzeug);
+
+                        if (string.IsNullOrEmpty(a.Form))
+                            a.Form = a.Werkzeug.ToString();
+
+                        try
+                        {
+                            if (reader.IsDBNull("Grundeinstellung") || string.IsNullOrEmpty(reader.GetString("Grundeinstellung")))
+                                m.PruefPack = 0;
+                            else
+                                m.PruefPack = reader.GetInt32("Grundeinstellung");
+                        }
+                        catch
+                        {
+                            m.PruefPack = 0;
+                        }
+
+                        // Kavität ermitteln (vereinfacht gegenüber Delphi: aus PDE.Kopfgroesse)
+                        int kav;
+                        try
+                        {
+                            if (KavitaetFromSPS)
+                            {
+                                kav = m.Kopfgroesse; // SPS-Wert wird im Dienstlauf aktualisiert
+                                if (kav < 1)
+                                    kav = 1;
+                            }
+                            else
+                            {
+                                string kavSql = "SELECT * FROM kavprot WHERE betriebsauftragnr = '"
+                                    + a.BetriebsauftragNr + "' ORDER BY datum DESC";
+                                using (var kavReader = _database.ExecuteReader(kavSql))
+                                {
+                                    if (!await kavReader.ReadAsync(stoppingToken) || !Kavitaet_laufender_Auftrag3)
+                                    {
+                                        kav = reader.GetInt32("Kopfgroesse");
+                                        a.LetzerKavWechsel.Datum = DateTime.MinValue;
+                                    }
+                                    else
+                                    {
+                                        a.LetzerKavWechsel.Datum = DateTime.FromOADate(kavReader.GetDouble("datum"));
+                                        a.LetzerKavWechsel.BetriebsauftragNr = a.BetriebsauftragNr;
+                                        a.LetzerKavWechsel.Alt = kavReader.GetInt32("Wert1");
+                                        a.LetzerKavWechsel.Neu = kavReader.GetInt32("Wert2");
+                                        a.LetzerKavWechsel.Produziert = kavReader.GetInt32("Produziert");
+                                        a.LetzerKavWechsel.Schusszaehler = kavReader.GetInt32("Schusszaehler");
+                                        if (a.LetzerKavWechsel.Produziert > 0 && a.LetzerKavWechsel.Schusszaehler < 1)
+                                            a.LetzerKavWechsel.Datum = DateTime.MinValue;
+                                        kav = a.LetzerKavWechsel.Neu;
+                                    }
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            try
+                            {
+                                a.LetzerKavWechsel.Datum = DateTime.MinValue;
+                                kav = reader.GetInt32("Kavitaet_Soll");
+                                await _database.ExecuteNonQueryAsync(
+                                    "UPDATE pde SET kopfgroesse = kavitaet_soll WHERE nr = "
+                                    + reader.GetInt32("nr"), stoppingToken);
+                            }
+                            catch
+                            {
+                                kav = 1;
+                                await _database.ExecuteNonQueryAsync(
+                                    "UPDATE pde SET kopfgroesse = 1, kavitaet_soll = 1 WHERE nr = "
+                                    + reader.GetInt32("nr"), stoppingToken);
+                            }
+                        }
+
+                        // OptimiertAktuell bei Kavitäts-Wechsel detailliert berechnen
+                        a.OptimiertAktuell = a.OptimiertAktuell * kav;
+
+                        a.BetriebsauftragNrAlt = a.BetriebsauftragNr;
+                        a.Kopfgroesse = kav;
+                        a.KAVITAET_SOLL = reader.GetInt32("KAVITAET_SOLL");
+                        a.InPause = reader.GetInt32("InPause");
+
+                        a.VarKavitaet = reader.GetInt32("Var_Kavitaet");
+                        if (a.VarKavitaet < 1)
+                            a.VarKavitaet = 1;
+                        if (a.VarKavitaet > 999)
+                            a.VarKavitaet = 1;
+                    }
+                }
+
+                // -----------------------------------------------------------------
+                // 6) Maschinen ohne aktuellen Auftrag zurücksetzen
+                // -----------------------------------------------------------------
+                foreach (var m in _s7Data.Includis)
+                {
+                    if (string.IsNullOrEmpty(m.Auftrag.AuftragNr) && !m.Auftrag.WasReset)
+                    {
+                        m.MusternAktiv = false;
+                        m.Auftrag.Mustern = false;
+                        m.Auftrag.Bezeichnung = ArbeitUtils.GetL("kein aktueller Auftrag");
+                        m.Auftrag.BetriebsauftragNr = string.Empty;
+                        m.Auftrag.Zustaendig = string.Empty;
+                        m.Auftrag.Signal = string.Empty;
+                        m.Auftrag.Sollwert = 0;
+                        m.Auftrag.SollwertOffset = 0;
+                        m.Auftrag.Vorwarnung = 0;
+                        m.Auftrag.Erzeugt = false;
+                        m.Auftrag.Solltakt = 0;
+                        m.Auftrag.Stat = StGeplantInt;
+                        m.Auftrag.Werkzeug = 0;
+                        m.PruefPack = 1;
+                        m.Auftrag.Kopfgroesse = KavitaetFromSPS ? m.Kopfgroesse : m.Kopfgroesse;
+                        if (m.Auftrag.Kopfgroesse == 0)
+                            m.Auftrag.Kopfgroesse = 1;
+                        m.Auftrag.KAVITAET_SOLL = 1;
+                        m.Auftrag.InPause = 0;
+                        m.Auftrag.VarKavitaet = 1;
+                        m.IstTakt = 0;
+                        m.Solltakt = 0;
+                        m.StueckSchicht = 0;
+                        m.StueckPackSchicht = 0;
+                        m.StueckPruefSchicht = 0;
+                        m.Nutzung = 0;
+                        m.Leistung = 0;
+                        m.Qualitaet = 0;
+                        m.Effektivitaet = 0;
+                        m.Auftrag.IstPRZ = 0;
+                        m.Auftrag.ProgrammNr = 0;
+                        m.Auftrag.Istwert = 0;
+                        m.Auftrag.Ausschuss = 0;
+                        m.Auftrag.Verpackt = 0;
+                        m.StueckPruefAuftragGesamt = 0;
+                        m.StueckPackAuftragGesamt = 0;
+                        m.Auftrag.Schwesterauftrag = string.Empty;
+                        m.Auftrag.Form = string.Empty;
+                        m.Auftrag.PersonalZeit = 0;
+                        m.Auftrag.Anfahrausschuss = 0;
+                        m.Auftrag.Kunde = string.Empty;
+                        m.Auftrag.WasReset = true;
+                    }
+                }
+
+                // -----------------------------------------------------------------
+                // 7) Unterbrochene Aufträge: Bezeichnung setzen
+                // -----------------------------------------------------------------
+                if (await GetSetupParamBoolAsync("INCL_MJAInterruptedDescr", stoppingToken))
+                {
+                    sql = "SELECT m.maschid, CASE WHEN p.c IS NULL THEN 0 ELSE 1 END interrupted"
+                        + " FROM maschine m"
+                        + " LEFT JOIN (SELECT lizenz, COUNT(nr) c FROM pde WHERE stat = 5 GROUP BY lizenz) p"
+                        + " ON p.lizenz = m.lizenz ORDER BY maschid";
+                    using (var reader = _database.ExecuteReader(sql))
+                    {
+                        while (await reader.ReadAsync(stoppingToken))
+                        {
+                            int i = reader.GetInt32("maschid");
+                            if (i > 0 && i <= _s7Data.Includis.Count)
+                            {
+                                if (reader.GetInt32("interrupted") > 0
+                                    && string.IsNullOrEmpty(_s7Data.Includis[i - 1].Auftrag.AuftragNr))
+                                {
+                                    _s7Data.Includis[i - 1].Auftrag.InterBezeichnung =
+                                        ArbeitUtils.GetL("Auftrag unterbrochen");
+                                }
+                                else
+                                {
+                                    _s7Data.Includis[i - 1].Auftrag.InterBezeichnung =
+                                        _s7Data.Includis[i - 1].Auftrag.Bezeichnung;
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var m in _s7Data.Includis)
+                    {
+                        if (!m.IstArchiviert)
+                            m.Auftrag.InterBezeichnung = m.Auftrag.Bezeichnung;
+                    }
+                }
+
+                // -----------------------------------------------------------------
+                // 8) BDE-Daten (MDE-Tabelle, Erzeugt=0) laden
+                // -----------------------------------------------------------------
+                foreach (var m in _s7Data.Includis)
+                {
+                    m.BDE.Bezeichnung = string.Empty;
+                    m.BDE.Zustaendig = string.Empty;
+                    m.BDE.Signal = string.Empty;
+                    m.BDE.Sollwert = 0;
+                    m.BDE.Vorwarnung = 0;
+                    m.BDE.Erzeugt = false;
+                    m.BDE.VorwarnungErzeugt = false;
+                }
+
+                sql = "SELECT * FROM MDE WHERE Erzeugt = 0";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        string wert = reader.GetString("Lizenz");
+                        int i = -1;
+                        for (int j = 0; j < _s7Data.Includis.Count; j++)
+                        {
+                            if (_s7Data.Includis[j].Lizenz == wert)
+                            {
+                                i = j;
+                                break;
+                            }
+                        }
+                        if (i >= 0)
+                        {
+                            _s7Data.Includis[i].BDE.Bezeichnung = reader.GetString("JobBezeichnung");
+                            _s7Data.Includis[i].BDE.Zustaendig = reader.GetString("Zustaendig");
+                            _s7Data.Includis[i].BDE.Signal = reader.GetString("Signal");
+                            _s7Data.Includis[i].BDE.Sollwert = reader.GetInt32("Sollwert_ABS");
+                            _s7Data.Includis[i].BDE.Vorwarnung = reader.GetInt32("Vorwarnung_ABS");
+                            _s7Data.Includis[i].BDE.Erzeugt = reader.GetString("Erzeugt") == "1";
+                            _s7Data.Includis[i].BDE.VorwarnungErzeugt = false;
+                        }
+                    }
+                }
+
+                // -----------------------------------------------------------------
+                // 9) saveeverycycle und Taktoption laden -> ArtikelZyklus
+                // -----------------------------------------------------------------
+                bool everycycle = false;
+                sql = "SELECT saveeverycycle FROM setup WHERE nr = 1";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    if (await reader.ReadAsync(stoppingToken))
+                    {
+                        everycycle = reader.GetInt32("saveeverycycle") == 1;
+                    }
+                }
+
+                // Taktoption je Lizenz laden
+                sql = "SELECT * FROM Taktoption";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        int i = CCC_GetMaschNrLizenzAsInt(reader.GetString("lizenz"));
+                        if (i > 0 && i <= _s7Data.Includis.Count)
+                            _s7Data.Includis[i - 1].ArtikelZyklus = reader.GetInt32("Artikelzyklus");
+                    }
+                }
+
+                foreach (var m in _s7Data.Includis)
+                {
+                    if (m.IstArchiviert)
+                        continue;
+                    if (everycycle)
+                        m.ArtikelZyklus = 1;
+                    else if (m.ArtikelZyklus == 0)
+                        m.ArtikelZyklus = 100;
+                }
+
+                // -----------------------------------------------------------------
+                // 10) TPM-Stillstandsdefinitionen laden (Stillstand-Array)
+                // -----------------------------------------------------------------
+                _s7Data.Stillstaende.Clear();
+                sql = "SELECT * FROM TPM_Stillstaende";
+                using (var reader = _database.ExecuteReader(sql))
+                {
+                    while (await reader.ReadAsync(stoppingToken))
+                    {
+                        _s7Data.Stillstaende.Add(new StillstandDefinition
+                        {
+                            Stillstandnr = reader.GetInt32("Stillstandnr"),
+                            Bezeichnung = reader.GetString("Stillstand"),
+                            Aktion = reader.GetInt32("Aktion"),
+                            Gruppe = reader.GetInt32("Gruppe"),
+                            Geplant = reader.GetInt32("Geplant") == 1
+                        });
+                    }
+                }
+
+                // -----------------------------------------------------------------
+                // 11) HochlaufTPM: MaschZustand-Array initialisieren
+                // -----------------------------------------------------------------
+                if (HochlaufTPM)
+                {
+                    _s7Data.MaschZustand.Clear();
+                    foreach (var m in _s7Data.Includis)
+                    {
+                        _s7Data.MaschZustand.Add(new MaschZustandItem
+                        {
+                            MaschNr = m.MaschNr,
+                            Zustand = -1
+                        });
+                    }
+                    HochlaufTPM = false;
+                }
+
+                _logger.LogInformation("CCC_Init: Initialisierung abgeschlossen ({Anzahl} Maschinen, {Stillstaende} Stillstaende)",
+                    _s7Data.Includis.Count, _s7Data.Stillstaende.Count);
             }
             catch (Exception ex)
             {
@@ -61,7 +741,7 @@ namespace INCLService.CSharp.Services
             {
                 _logger.LogDebug("CCC_SchreibeSystemID: System-ID wird geschrieben");
                 
-                string serverName = _s7MainService.ServerNameDesDienstes;
+                string serverName = _s7MainService?.ServerNameDesDienstes ?? Environment.MachineName.ToUpper();
                 string sql = $"UPDATE Setup SET SystemID = '{serverName}' WHERE Nr = 1";
                 
                 await _database.ExecuteNonQueryAsync(sql, stoppingToken);
@@ -661,9 +1341,9 @@ namespace INCLService.CSharp.Services
         /// Prüft Schichtwechsel
         /// Äquivalent zu NeueSchicht in DBMain.pas (Zeile 3641)
         /// </summary>
-        public async Task<bool> NeueSchichtAsync(out int alteSchicht, CancellationToken stoppingToken)
+        public async Task<(bool HasChanged, int AlteSchicht)> NeueSchichtAsync(CancellationToken stoppingToken)
         {
-            alteSchicht = -1;
+            int alteSchicht = -1;
             try
             {
                 _logger.LogDebug("NeueSchicht: Schichtwechsel wird geprüft");
@@ -683,18 +1363,18 @@ namespace INCLService.CSharp.Services
                             await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                             
                             _logger.LogInformation("NeueSchicht: Schichtwechsel erkannt (Alte Schicht: {AlteSchicht})", alteSchicht);
-                            return true;
+                            return (true, alteSchicht);
                         }
                     }
                 }
                 
                 _logger.LogDebug("NeueSchicht: Kein Schichtwechsel erkannt");
-                return false;
+                return (false, alteSchicht);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "NeueSchicht: Fehler bei der Schichtwechsel-Prüfung");
-                return false;
+                return (false, alteSchicht);
             }
         }
 

@@ -1,6 +1,8 @@
 using INCLUDIS.Utils.CommonDB;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace INCLService.CSharp.Services
 {
@@ -84,6 +86,16 @@ namespace INCLService.CSharp.Services
                 return -1; // Fehler
             }
         }
+        /// <summary>
+        /// TPM-Korrektur: Doppelte/fehlerhafte Stillstandsdaten bereinigen.
+        /// Entspricht TPM_Korrektur in Delphi. Stub-Implementierung; die
+        /// detaillierte Berechnung wird in einem spaeteren Schritt portiert.
+        /// </summary>
+        public async Task TPM_KorrekturAsync(DateTime von, DateTime bis, bool berechnenTPMAuswertung, string mNrs, CancellationToken stoppingToken)
+        {
+            await Task.CompletedTask;
+        }
+
 
         /// <summary>
         /// Berechnet die TPM-Kennzahlen

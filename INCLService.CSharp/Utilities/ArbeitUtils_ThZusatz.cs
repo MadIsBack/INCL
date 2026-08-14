@@ -1,3 +1,4 @@
+using INCLService.CSharp.Services;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,7 @@ namespace INCLService.CSharp.Utilities
     /// </summary>
     public class ArbeitUtilsThZusatz
     {
-        private readonly ILogger<ArbeitUtilsThZusatz> _logger;
+        private readonly ILogger _logger;
         private readonly CommonDB _database;
         private readonly ArbeitUtils _arbeitUtils;
         
@@ -24,7 +25,7 @@ namespace INCLService.CSharp.Utilities
         public int Schicht3 { get; set; } = 22;
         public int ShiftModel { get; set; } = 1;
         
-        public ArbeitUtilsThZusatz(ILogger<ArbeitUtilsThZusatz> logger, CommonDB database, ArbeitUtils arbeitUtils)
+        public ArbeitUtilsThZusatz(ILogger logger, CommonDB database, ArbeitUtils arbeitUtils)
         {
             _logger = logger;
             _database = database;
@@ -220,8 +221,8 @@ namespace INCLService.CSharp.Utilities
                         // Zeit berechnen
                         int Zeit = _arbeitUtils.ZeitInMinuten(Liz, D1, D2, halbautomatik);
                         int Zeit_Rest = _arbeitUtils.ZeitInMinuten(Liz, 
-                            Math.Max(D1, DateTime.Now),
-                            Math.Max(D2, DateTime.Now),
+                            (D1 > DateTime.Now ? D1 : DateTime.Now),
+                            (D2 > DateTime.Now ? D2 : DateTime.Now),
                             halbautomatik);
                         
                         // Laufzeit_Plan berechnen
@@ -395,8 +396,8 @@ namespace INCLService.CSharp.Utilities
                         // Zeit berechnen
                         int Zeit = _arbeitUtils.ZeitInMinuten(Liz, D1, D2, halbautomatik);
                         int Zeit_Rest = _arbeitUtils.ZeitInMinuten(Liz, 
-                            Math.Max(D1, DateTime.Now),
-                            Math.Max(D2, DateTime.Now),
+                            (D1 > DateTime.Now ? D1 : DateTime.Now),
+                            (D2 > DateTime.Now ? D2 : DateTime.Now),
                             halbautomatik);
                         
                         // Laufzeit_Plan berechnen

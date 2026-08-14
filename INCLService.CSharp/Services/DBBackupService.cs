@@ -147,7 +147,7 @@ namespace INCLService.CSharp.Services
                     _appConfig.Database.Provider.Contains("SQL") ||
                     string.IsNullOrEmpty(_appConfig.Database.Provider))
                 {
-                    string sql = $"BACKUP DATABASE [{_appConfig.Database.InitialCatalog}] 
+                    string sql = $@"BACKUP DATABASE [{_appConfig.Database.InitialCatalog}] 
                         TO DISK = '{backupFilePath}' 
                         WITH COMPRESSION, STATS = 10";
                     

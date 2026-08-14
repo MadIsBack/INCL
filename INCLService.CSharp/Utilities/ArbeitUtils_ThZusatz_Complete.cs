@@ -1,3 +1,4 @@
+using INCLService.CSharp.Services;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,7 @@ namespace INCLService.CSharp.Utilities
     /// </summary>
     public class ArbeitUtilsThZusatzComplete
     {
-        private readonly ILogger<ArbeitUtilsThZusatzComplete> _logger;
+        private readonly ILogger _logger;
         private readonly CommonDB _database;
         private readonly ArbeitUtils _arbeitUtils;
         
@@ -24,7 +25,7 @@ namespace INCLService.CSharp.Utilities
         public int Schicht3 { get; set; } = 22;
         public int ShiftModel { get; set; } = 1;
         
-        public ArbeitUtilsThZusatzComplete(ILogger<ArbeitUtilsThZusatzComplete> logger, CommonDB database, ArbeitUtils arbeitUtils)
+        public ArbeitUtilsThZusatzComplete(ILogger logger, CommonDB database, ArbeitUtils arbeitUtils)
         {
             _logger = logger;
             _database = database;
