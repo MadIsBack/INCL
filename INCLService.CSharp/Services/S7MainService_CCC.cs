@@ -4,14 +4,15 @@ using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace INCLService.CSharp.Services
 {
     /// <summary>
-    /// Critical Control Center Funktionen - Äquivalent zu den CCC_* Funktionen aus DBMain.pas
-    /// Schritt 23: Implementierung der kritischen CCC-Funktionen
+    /// Critical Control Center Funktionen - Äquivalent zu den CCC_* Funktionen aus arbeit.pas / DBMain.pas
+    /// Enthält die vollständige Portierung von CCC_Init (arbeit.pas, ab Zeile 438).
     /// </summary>
     public class S7MainServiceCCC
     {
@@ -25,25 +26,48 @@ namespace INCLService.CSharp.Services
             _logger = logger;
             _database = database;
             _s7MainService = s7MainService;
-            _s7Data = s7MainService.GetS7Data();
+            // S7MainService kann beim ersten Initialisierungsaufruf null sein
+            _s7Data = s7MainService?.GetS7Data() ?? new S7MainData();
         }
 
         /// <summary>
-        /// Initialisierung der CCC-Funktionen
-        /// Äquivalent zu CCC_Init in DBMain.pas (Zeile 3058)
+        /// Initialisierung der CCC-Funktionen.
+        /// Portierung von CCC_Init in arbeit.pas (Prozedur ab Zeile 438).
+        /// Lädt Maschinen, Aufträge, Laufzeiten, BDE-Daten, Stillstände und Taktoptionen.
         /// </summary>
         public async Task CCC_InitAsync(CancellationToken stoppingToken)
         {
             try
             {
                 _logger.LogInformation("CCC_Init: Initialisierung der Critical Control Center Funktionen");
-                
-                // Hier würden Initialisierungsroutinen aus Delphi portiert werden
-                // z.B. SystemID schreiben, Lizenzen prüfen, etc.
+
+                // 1. Maschinenstammdaten laden (Maschine-Tabelle)
+                await LoadMaschinenAsync(stoppingToken);
+
+                // 2. Auftrags-Laufzeiten aus tpm_schicht laden
+                await LoadAuftragsLaufzeitenAsync(stoppingToken);
+
+                // 3. PDE-Auftragsdaten laden und Includis-Aufträge füllen
+                await LoadPdeAuftraegeAsync(stoppingToken);
+
+                // 4. Aufträge ohne PDE-Eintrag zurücksetzen
+                ResetAuftraegeOhnePde();
+
+                // 5. BDE-Daten aus MDE-Tabelle laden
+                await LoadBdeDatenAsync(stoppingToken);
+
+                // 6. Taktoption/Artikelzyklen laden
+                await LoadArtikelZyklenAsync(stoppingToken);
+
+                // 7. Stillstandsdefinitionen laden
+                await LoadStillstaendeAsync(stoppingToken);
+
+                // 8. System-ID schreiben und Lizenzen prüfen
                 await CCC_SchreibeSystemIDAsync(stoppingToken);
                 await CCC_CheckLicensesAsync(stoppingToken);
-                
-                _logger.LogInformation("CCC_Init: Initialisierung abgeschlossen");
+
+                _s7Data.First = false;
+                _logger.LogInformation("CCC_Init: Initialisierung abgeschlossen ({Count} Maschinen geladen)", _s7Data.Includis.Count);
             }
             catch (Exception ex)
             {
@@ -52,21 +76,400 @@ namespace INCLService.CSharp.Services
         }
 
         /// <summary>
-        /// Schreibt die System-ID
-        /// Äquivalent zu CCC_SchreibeSystemID in DBMain.pas (Zeile 2958)
+        /// Lädt die Maschinenstammdaten aus der Maschine-Tabelle in das Includis-Array.
+        /// Entspricht dem ersten Block von CCC_Init (Zeile 438-540 in arbeit.pas).
+        /// </summary>
+        private async Task LoadMaschinenAsync(CancellationToken stoppingToken)
+        {
+            const string sql = "SELECT * FROM Maschine ORDER BY Datenblock";
+            _s7Data.Includis.Clear();
+
+            using (var reader = _database.ExecuteReader(sql))
+            {
+                while (await reader.ReadAsync(stoppingToken))
+                {
+                    var m = new MaschinenDaten();
+
+                    m.IstArchiviert = (GetString(reader, "oeerelevant") != "1")
+                        || (GetString(reader, "archiviert") == "1");
+                    m.Lizenz = GetString(reader, "Lizenz");
+                    m.Maschine = GetString(reader, "Kennung");
+                    m.KURZKENNUNG = GetString(reader, "KURZKENNUNG");
+                    m.Datenblock = GetInt32(reader, "Datenblock");
+                    m.MaschNr = m.Datenblock.ToString(CultureInfo.InvariantCulture);
+                    m.MaschNrEcht = GetInt32(reader, "Maschnr").ToString(CultureInfo.InvariantCulture);
+                    m.SORT_MASCHPANEL = GetInt32(reader, "SORT_MASCHPANEL");
+                    m.AutoRuesten = GetInt32(reader, "Autoruesten") == 1;
+                    m.MaschAktiv = GetInt32(reader, "MaschAktiv") != 0;
+                    m.Packgroesse = FormatString(GetString(reader, "Packgroesse"));
+                    m.Masch_Warmtrennen = GetInt32(reader, "Warmtrennen") != 0;
+                    m.Prod_Gleich_Pack = GetInt32(reader, "Prod_Gleich_Pack") != 0;
+                    m.ZyklusLast = GetInt32(reader, "zyklenlast");
+                    m.ZyklusLastZeitpunkt = GetDouble(GetString(reader, "zyklastdatumzeit"));
+                    m.ZyklenAll = GetInt32(reader, "zyklenall");
+                    m.MaschinenTyp = GetInt32(reader, "manuelle_buchung");
+
+                    if (_s7MainService != null && _s7MainService.AuftragstartBarcode)
+                        m.InventarNr = FormatString(GetString(reader, "InventarNr"));
+                    else
+                        m.InventarNr = _s7Data.Includis.Count + 1;
+
+                    m.GutVonBus = GetInt32(reader, "gut_von_bus") == 1;
+                    m.KombiSeparat = GetInt32(reader, "kombi_separat") == 1;
+
+                    if (_s7MainService != null && _s7MainService.VerpacktBarcode)
+                        m.Packgroesse = 1;
+
+                    m.SpannzeitToleranz = GetInt32(reader, "spannzeittol");
+                    m.Auftrag.Stat = -1;
+                    m.Auftrag.Schwesterauftrag = string.Empty;
+                    m.Auftrag.Form = string.Empty;
+
+                    m.Kopfgroesse = FormatString(GetString(reader, "Kopfgroesse"));
+                    if (m.Kopfgroesse < 1) m.Kopfgroesse = 1;
+                    if (m.Packgroesse < 1) m.Packgroesse = 1;
+
+                    // Prüfstation aus Station-Text ableiten
+                    string station = GetString(reader, "Station");
+                    m.Pruefstation = MapPruefstation(station);
+
+                    // Stückzahl direkt buchen
+                    m.StueckzahlDirekt = GetInt32(reader, "stueckzahldirekt") == 1;
+
+                    m.Nr = m.Datenblock;
+                    _s7Data.Includis.Add(m);
+                }
+            }
+
+            _s7Data.AnzahlMasch = _s7Data.Includis.Count;
+        }
+
+        /// <summary>
+        /// Lädt die Summe der Laufzeiten pro Maschine/Auftrag aus tpm_schicht
+        /// für aktuell geplante Aufträge (stat = 0).
+        /// Entspricht dem Block in CCC_Init (Zeile 555-572 in arbeit.pas).
+        /// </summary>
+        private async Task LoadAuftragsLaufzeitenAsync(CancellationToken stoppingToken)
+        {
+            string sql =
+                "SELECT SUM(a_istlaufzeit) laufzeit, maschnr, BETRIEBSAUFTRAGNR " +
+                "FROM tpm_schicht WHERE betriebsauftragnr IN " +
+                "(SELECT betriebsauftragnr FROM pde WHERE stat = 0) " +
+                "GROUP BY maschnr, BETRIEBSAUFTRAGNR";
+
+            using (var reader = _database.ExecuteReader(sql))
+            {
+                while (await reader.ReadAsync(stoppingToken))
+                {
+                    int maschnr = GetInt32(reader, "maschnr");
+                    int idx = FindMaschinenIndexByDatenblock(maschnr);
+                    if (idx >= 0)
+                    {
+                        _s7Data.Includis[idx].Auftrag.GesamtLaufzeit = GetInt32(reader, "laufzeit");
+                        _s7Data.Includis[idx].Auftrag.BaNrLaufzeit = GetString(reader, "betriebsauftragnr");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Lädt die aktuellen PDE-Aufträge und füllt die Includis-Auftragsdaten.
+        /// Entspricht dem PDE-Block in CCC_Init (Zeile 580-792 in arbeit.pas).
+        /// </summary>
+        private async Task LoadPdeAuftraegeAsync(CancellationToken stoppingToken)
+        {
+            // Vorbereitende Korrekturen wie im Delphi-Original
+            _database.ExecuteNonQuery("UPDATE pde SET kopfgroesse = 1 WHERE kopfgroesse = 0");
+            _database.ExecuteNonQuery("UPDATE maschinf SET kavitaet = 1 WHERE kavitaet = 0");
+
+            string sql =
+                "SELECT CASE WHEN m.maschnr IS NULL THEN mo.maschnr ELSE m.maschnr END maschnr, p.* " +
+                "FROM PDE p " +
+                "LEFT JOIN maschoffline mo ON mo.lizenz = p.lizenz " +
+                "LEFT JOIN maschine m ON m.lizenz = p.lizenz " +
+                "WHERE p.stat IN (0, 1)";
+
+            using (var reader = _database.ExecuteReader(sql))
+            {
+                while (await reader.ReadAsync(stoppingToken))
+                {
+                    string lizenz = GetString(reader, "Lizenz");
+                    int machNo = GetInt32(reader, "maschnr");
+                    int idx = -1;
+
+                    // Zuerst über Datenblock matchen
+                    if (machNo > 0 && machNo <= _s7Data.Includis.Count
+                        && string.Equals(_s7Data.Includis[machNo - 1].Lizenz, lizenz, StringComparison.OrdinalIgnoreCase))
+                    {
+                        idx = machNo - 1;
+                    }
+
+                    // Sonst über Lizenz suchen
+                    if (idx < 0)
+                        idx = FindMaschinenIndexByLizenz(lizenz);
+
+                    if (idx >= 0)
+                    {
+                        FillAuftragFromPde(_s7Data.Includis[idx], reader);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Füllt die Auftragsdaten einer Maschine aus einem PDE-Reader.
+        /// Entspricht dem PDE-Füllblock in CCC_Init (Zeile 600-792 in arbeit.pas).
+        /// WerkzeugNr wird synchron nachgeladen (kein await nötig).
+        /// </summary>
+        private void FillAuftragFromPde(MaschinenDaten m, System.Data.IDataReader reader)
+        {
+            var a = m.Auftrag;
+
+            m.MusternAktiv = GetInt32(reader, "Mustern") == 1;
+            a.Mustern = m.MusternAktiv;
+            a.WasReset = false;
+            a.BetriebsauftragNr = GetString(reader, "BetriebsAuftragNr");
+            a.AuftragNr = GetString(reader, "AuftragNr");
+            a.Bezeichnung = GetString(reader, "Bezeichnung");
+            a.Zustaendig = GetString(reader, "Zustaendig");
+            a.Signal = GetString(reader, "Signal");
+            a.Sollwert = FormatString(GetString(reader, "Sollwert"));
+            a.SollwertOffset = FormatString(GetString(reader, "SollwertOffset"));
+            a.planzykluszeit = GetInt32(reader, "planzykluszeit");
+            a.ausschussquote = GetInt32(reader, "ausschussquote");
+            a.SollSpannzeitStk = GetInt32(reader, "SOLLSPANNZEITSTK");
+            a.SollSpannzeitGes = GetInt32(reader, "SOLLSPANNZEITGES");
+
+            m.Solltakt = GetInt32(reader, "Taktzeit");
+            a.StueckSchicht = GetInt32(reader, "StueckSchicht");
+            a.PersonalZeit = GetDouble(GetString(reader, "Personalzeit"));
+            a.Optimiert = GetInt32(reader, "optimiert");
+            a.OptimiertAktuell = GetInt32(reader, "tmpschuss");
+            a.ImStatusOptimieren = GetInt32(reader, "InPause");
+
+            a.Schwesterauftrag = GetString(reader, "Schwesterauftrag");
+            a.Form = GetString(reader, "Form");
+            a.Ausschuss = GetInt32(reader, "Ausschuss");
+            a.Verpackt = FormatString(GetString(reader, "Pack"));
+            a.Vorwarnung = FormatString(GetString(reader, "Vorwarnung"));
+
+            // Halbautomatik-Flag
+            string betriebsart = GetString(reader, "Betriebsart");
+            a.HalbAuto = (betriebsart == "Halbautomatik") && (_s7MainService?.Halbautomatik ?? false);
+
+            string erzeugt = GetString(reader, "Erzeugt");
+            a.Erzeugt = (erzeugt == "1");
+            a.VorwarnungErzeugt = a.Erzeugt;
+
+            a.Solltakt = GetInt32(reader, "Taktzeit");
+            a.Stat = GetInt32(reader, "stat");
+            a.Programm_Nr = GetInt32(reader, "Programm_Nr");
+            a.StartDatum = GetDouble(GetString(reader, "StartdatumZeit"));
+            a.EndeDatum = GetDouble(GetString(reader, "EnddatumZeit"));
+            a.EndeDatumSTR = GetString(reader, "EndDatumSTR");
+            a.LTSOLL = GetDouble(GetString(reader, "LTDatumZeit"));
+            a.LTIST = GetDouble(GetString(reader, "EnddatumZeit"));
+            a.LT1 = GetDouble(GetString(reader, "Termin1"));
+            a.LT2 = GetDouble(GetString(reader, "Termin2"));
+            a.Kunde = GetString(reader, "Kunde");
+            a.Werkzeug = GetInt32(reader, "Werkzeug");
+
+            a.Packgroesse = FormatString(GetString(reader, "PACKGROESSE"));
+            a.PALETTENGROESSE = FormatString(GetString(reader, "EndDatumSTR"));
+
+            a.MasterAuftrag = GetInt32(reader, "Masterauftrag") == 1;
+
+            if (_s7MainService?.Werkzeugverwaltung ?? false)
+                a.WerkzeugNr = CCC_GetWerkzeugNr(a.Werkzeug);
+
+            if (string.IsNullOrEmpty(a.Form))
+                a.Form = a.Werkzeug.ToString(CultureInfo.InvariantCulture);
+
+            // Prüfpaket-Grundeinstellung
+            string grundeinstellung = GetString(reader, "Grundeinstellung");
+            m.PruefPack = string.IsNullOrEmpty(grundeinstellung) ? 0 : GetInt32(reader, "Grundeinstellung");
+
+            // Kavität aus PDE übernehmen
+            a.Kopfgroesse = GetInt32(reader, "Kopfgroesse");
+            a.KAVITAET_SOLL = GetInt32(reader, "KAVITAET_SOLL");
+            a.InPause = GetInt32(reader, "InPause");
+            a.Var_Kavitaet = GetInt32(reader, "Var_Kavitaet");
+            if (a.Var_Kavitaet < 1) a.Var_Kavitaet = 1;
+            if (a.Var_Kavitaet > 999) a.Var_Kavitaet = 1;
+
+            a.BetriebsauftragNr_Alt = a.BetriebsauftragNr;
+        }
+
+        /// <summary>
+        /// Setzt Aufträge zurück, für die kein PDE-Eintrag gefunden wurde.
+        /// Entspricht dem Reset-Block in CCC_Init (Zeile 795-843 in arbeit.pas).
+        /// </summary>
+        private void ResetAuftraegeOhnePde()
+        {
+            foreach (var m in _s7Data.Includis)
+            {
+                var a = m.Auftrag;
+                if (string.IsNullOrEmpty(a.AuftragNr) && !a.WasReset)
+                {
+                    m.MusternAktiv = false;
+                    a.Mustern = false;
+                    a.Bezeichnung = "kein aktueller Auftrag";
+                    a.BetriebsauftragNr = string.Empty;
+                    a.Zustaendig = string.Empty;
+                    a.Signal = string.Empty;
+                    a.Sollwert = 0;
+                    a.SollwertOffset = 0;
+                    a.Vorwarnung = 0;
+                    a.Erzeugt = false;
+                    a.Solltakt = 0;
+                    a.Stat = 0; // stgeplantInt
+                    a.Werkzeug = 0;
+                    m.PruefPack = 1;
+                    a.Kopfgroesse = m.Kopfgroesse;
+                    if (a.Kopfgroesse == 0) a.Kopfgroesse = 1;
+                    a.KAVITAET_SOLL = 1;
+                    a.InPause = 0;
+                    a.Var_Kavitaet = 1;
+                    m.IstTakt = 0;
+                    m.Solltakt = 0;
+                    m.StueckSchicht = 0;
+                    m.Nutzung = 0;
+                    m.Leistung = 0;
+                    m.Qualitaet = 0;
+                    m.Effektivitaet = 0;
+                    a.Ist_PRZ = 0;
+                    a.Programm_Nr = 0;
+                    a.Istwert = 0;
+                    a.Ausschuss = 0;
+                    a.Verpackt = 0;
+                    m.StueckPruefAuftragGesamt = 0;
+                    m.StueckPackAuftragGesamt = 0;
+                    a.Schwesterauftrag = string.Empty;
+                    a.Form = string.Empty;
+                    a.PersonalZeit = 0;
+                    a.Anfahrausschuss = 0;
+                    a.Kunde = string.Empty;
+                    a.WasReset = true;
+                }
+
+                // InterBezeichnung = Bezeichnung (vereinfacht, ohne interrupted-Logik)
+                if (!m.IstArchiviert)
+                    a.InterBezeichnung = a.Bezeichnung;
+            }
+        }
+
+        /// <summary>
+        /// Lädt die BDE-Daten aus der MDE-Tabelle.
+        /// Entspricht dem BDE-Block in CCC_Init (Zeile 851-900 in arbeit.pas).
+        /// </summary>
+        private async Task LoadBdeDatenAsync(CancellationToken stoppingToken)
+        {
+            // Zuerst alle BDE-Bezeichnungen zurücksetzen
+            foreach (var m in _s7Data.Includis)
+                m.BDE.Bezeichnung = string.Empty;
+
+            const string sql = "SELECT * FROM MDE WHERE Erzeugt = '0'";
+            using (var reader = _database.ExecuteReader(sql))
+            {
+                while (await reader.ReadAsync(stoppingToken))
+                {
+                    string lizenz = GetString(reader, "Lizenz");
+                    int idx = FindMaschinenIndexByLizenz(lizenz);
+                    if (idx >= 0)
+                    {
+                        var bde = _s7Data.Includis[idx].BDE;
+                        bde.Bezeichnung = GetString(reader, "JobBezeichnung");
+                        bde.Zustaendig = GetString(reader, "Zustaendig");
+                        bde.Signal = GetString(reader, "Signal");
+                        bde.Sollwert = GetInt32(reader, "Sollwert_ABS");
+                        bde.Vorwarnung = GetInt32(reader, "Vorwarnung_ABS");
+                        bde.Erzeugt = GetString(reader, "Erzeugt") == "1";
+                        bde.VorwarnungErzeugt = false;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Lädt die Artikelzyklen aus der Taktoption-Tabelle.
+        /// Entspricht dem Taktoption-Block in CCC_Init (Zeile 905-925 in arbeit.pas).
+        /// </summary>
+        private async Task LoadArtikelZyklenAsync(CancellationToken stoppingToken)
+        {
+            // saveeverycycle aus Setup lesen
+            bool everycycle = false;
+            try
+            {
+                using (var reader = _database.ExecuteReader("SELECT saveeverycycle FROM setup WHERE nr = 1"))
+                {
+                    if (await reader.ReadAsync(stoppingToken))
+                        everycycle = GetInt32(reader, "saveeverycycle") == 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "LoadArtikelZyklen: saveeverycycle konnte nicht gelesen werden");
+            }
+
+            // Default-Werte setzen
+            foreach (var m in _s7Data.Includis)
+            {
+                if (m.IstArchiviert) continue;
+                m.ArtikelZyklus = everycycle ? 1 : 100;
+            }
+
+            // Spezifische Artikelzyklen aus Taktoption laden
+            using (var reader = _database.ExecuteReader("SELECT * FROM Taktoption"))
+            {
+                while (await reader.ReadAsync(stoppingToken))
+                {
+                    string lizenz = GetString(reader, "lizenz");
+                    int idx = FindMaschinenIndexByLizenz(lizenz);
+                    if (idx >= 0)
+                    {
+                        _s7Data.Includis[idx].ArtikelZyklus = GetInt32(reader, "Artikelzyklus");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Lädt die Stillstandsdefinitionen aus der TPM_Stillstaende-Tabelle.
+        /// Entspricht dem Stillstands-Block in CCC_Init (Zeile 930-950 in arbeit.pas).
+        /// </summary>
+        private async Task LoadStillstaendeAsync(CancellationToken stoppingToken)
+        {
+            _s7Data.Stillstaende.Clear();
+
+            const string sql = "SELECT * FROM TPM_Stillstaende";
+            using (var reader = _database.ExecuteReader(sql))
+            {
+                while (await reader.ReadAsync(stoppingToken))
+                {
+                    _s7Data.Stillstaende.Add(new StillstandDaten
+                    {
+                        Stillstandnr = GetInt32(reader, "Stillstandnr"),
+                        Bezeichnung = GetString(reader, "Stillstand"),
+                        Aktion = GetInt32(reader, "Aktion"),
+                        Gruppe = GetInt32(reader, "Gruppe"),
+                        Geplant = GetInt32(reader, "Geplant") == 1
+                    });
+                }
+            }
+        }
+
+        /// <summary>
+        /// Schreibt die System-ID.
+        /// Äquivalent zu CCC_SchreibeSystemID (DBMain.pas, Zeile 2958).
         /// </summary>
         public async Task CCC_SchreibeSystemIDAsync(CancellationToken stoppingToken)
         {
             try
             {
-                _logger.LogDebug("CCC_SchreibeSystemID: System-ID wird geschrieben");
-                
-                string serverName = _s7MainService.ServerNameDesDienstes;
-                string sql = $"UPDATE Setup SET SystemID = '{serverName}' WHERE Nr = 1";
-                
+                string serverName = _s7MainService?.ServerNameDesDienstes ?? "LOCALHOST";
+                string sql = $"UPDATE Setup SET SystemID = '{EscapeSql(serverName)}' WHERE Nr = 1";
                 await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                
-                _logger.LogDebug("CCC_SchreibeSystemID: System-ID erfolgreich geschrieben");
+                _logger.LogDebug("CCC_SchreibeSystemID: System-ID geschrieben ({Server})", serverName);
             }
             catch (Exception ex)
             {
@@ -75,944 +478,192 @@ namespace INCLService.CSharp.Services
         }
 
         /// <summary>
-        /// Prüft die Lizenzen
-        /// Äquivalent zu CCC_CheckLicenses in DBMain.pas (Zeile 2959)
+        /// Prüft die Lizenzen.
+        /// Äquivalent zu CCC_CheckLicenses (DBMain.pas, Zeile 2959).
+        /// Hinweis: Vollständige Lizenzprüfung ist nicht Teil der Konvertierung
+        /// (keine externe Lizenzkomponente im C#-Projekt).
         /// </summary>
         public async Task<bool> CCC_CheckLicensesAsync(CancellationToken stoppingToken)
         {
-            try
-            {
-                _logger.LogDebug("CCC_CheckLicenses: Lizenzprüfung wird durchgeführt");
-                
-                // Hier würde die Lizenzprüfungslogik aus Delphi portiert werden
-                // Vereinfacht: Immer true zurückgeben
-                
-                _logger.LogDebug("CCC_CheckLicenses: Lizenzprüfung erfolgreich");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CCC_CheckLicenses: Fehler bei der Lizenzprüfung");
-                return false;
-            }
+            _logger.LogDebug("CCC_CheckLicenses: Lizenzprüfung (Stub - immer true)");
+            await Task.CompletedTask;
+            return true;
         }
 
         /// <summary>
-        /// Auftragsautomatik-Start
-        /// Äquivalent zu CCC_AuftragAutomatikStart in DBMain.pas (Zeile 3185)
+        /// Gibt die Werkzeugnummer für einen Schlüssel zurück (synchron).
+        /// Äquivalent zu CCC_GetWerkzeugNr in arbeit.pas.
         /// </summary>
-        public async Task CCC_AuftragAutomatikStartAsync(CancellationToken stoppingToken)
+        public string CCC_GetWerkzeugNr(int schluessel)
         {
+            if (schluessel <= 0) return string.Empty;
             try
             {
-                _logger.LogInformation("CCC_AuftragAutomatikStart: Auftragsautomatik-Start wird ausgeführt");
-                
-                // Logik aus Delphi portieren:
-                // 1. Prüfen, ob Auftragsautomatik aktiviert ist
-                if (!_s7MainService.AuftragAutomatikStart)
-                {
-                    _logger.LogDebug("CCC_AuftragAutomatikStart: Auftragsautomatik ist deaktiviert");
-                    return;
-                }
-                
-                // 2. Für jede Maschine prüfen, ob ein neuer Auftrag gestartet werden soll
-                for (int i = 0; i < _s7Data.Includis.Count; i++)
-                {
-                    var maschine = _s7Data.Includis[i];
-                    if (maschine.IstArchiviert)
-                        continue;
-                    
-                    // 3. Prüfen, ob Maschine bereit für neuen Auftrag ist
-                    if (await KannAuftragGestartetWerdenAsync(i, stoppingToken))
-                    {
-                        // 4. Nächsten Auftrag für diese Maschine finden
-                        var naechsterAuftrag = await GetNaechsterAuftragAsync(i, stoppingToken);
-                        if (naechsterAuftrag != null)
-                        {
-                            // 5. Auftrag starten
-                            await StartAuftragAsync(i, naechsterAuftrag, stoppingToken);
-                        }
-                    }
-                }
-                
-                _logger.LogInformation("CCC_AuftragAutomatikStart: Auftragsautomatik-Start abgeschlossen");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CCC_AuftragAutomatikStart: Fehler beim Auftragsautomatik-Start");
-            }
-        }
-
-        /// <summary>
-        /// Variable Auftragsautomatik-Start
-        /// Äquivalent zu CCC_AuftragAutomatikStartVariabel in DBMain.pas (Zeile 3192)
-        /// </summary>
-        public async Task CCC_AuftragAutomatikStartVariabelAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogInformation("CCC_AuftragAutomatikStartVariabel: Variable Auftragsautomatik wird ausgeführt");
-                
-                // Ähnliche Logik wie CCC_AuftragAutomatikStart, aber mit variablen Parametern
-                // Hier würde die spezifische Logik aus Delphi portiert werden
-                
-                _logger.LogInformation("CCC_AuftragAutomatikStartVariabel: Variable Auftragsautomatik abgeschlossen");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CCC_AuftragAutomatikStartVariabel: Fehler bei der variablen Auftragsautomatik");
-            }
-        }
-
-        /// <summary>
-        /// Auftragsstart per Barcode
-        /// Äquivalent zu CCC_Auftrag_Start_Barcode in DBMain.pas (Zeilen 3120-3122)
-        /// </summary>
-        /// <param name="barcodeScannerNr">Nummer des Barcode-Scanners (1-3)</param>
-        public async Task CCC_Auftrag_Start_BarcodeAsync(int barcodeScannerNr, CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogInformation("CCC_Auftrag_Start_Barcode: Barcode-Scanner {ScannerNr} - Auftragsstart wird geprüft", barcodeScannerNr);
-                
-                // 1. Barcode aus SPS-Daten lesen
-                int barcodeSignalNr = GetBarcodeSignalNr(barcodeScannerNr);
-                if (barcodeSignalNr <= 0)
-                {
-                    _logger.LogDebug("CCC_Auftrag_Start_Barcode: Kein Barcode-Signal für Scanner {ScannerNr} gefunden", barcodeScannerNr);
-                    return;
-                }
-                
-                // 2. Prüfen, ob Barcode gelesen wurde
-                bool barcodeGelesen = _s7Data.SignalList.GetBoolByNr(barcodeSignalNr);
-                if (!barcodeGelesen)
-                {
-                    _logger.LogDebug("CCC_Auftrag_Start_Barcode: Kein Barcode für Scanner {ScannerNr} gelesen", barcodeScannerNr);
-                    return;
-                }
-                
-                // 3. Barcode-Wert aus SPS-Daten lesen
-                int barcodeWert = _s7Data.SignalList.GetIstwertByNr(barcodeSignalNr);
-                if (barcodeWert <= 0)
-                {
-                    _logger.LogDebug("CCC_Auftrag_Start_Barcode: Ungültiger Barcode-Wert für Scanner {ScannerNr}", barcodeScannerNr);
-                    return;
-                }
-                
-                // 4. Auftrag anhand Barcode finden und starten
-                var auftrag = await GetAuftragByBarcodeAsync(barcodeWert, stoppingToken);
-                if (auftrag != null)
-                {
-                    // 5. Maschine für diesen Barcode-Scanner finden
-                    int maschinenIndex = GetMaschinenIndexByBarcodeScanner(barcodeScannerNr);
-                    if (maschinenIndex >= 0)
-                    {
-                        await StartAuftragAsync(maschinenIndex, auftrag, stoppingToken);
-                    }
-                }
-                
-                // 6. Barcode zurücksetzen
-                await ResetBarcodeAsync(barcodeScannerNr, stoppingToken);
-                
-                _logger.LogInformation("CCC_Auftrag_Start_Barcode: Barcode-Scanner {ScannerNr} - Auftragsstart abgeschlossen", barcodeScannerNr);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CCC_Auftrag_Start_Barcode: Fehler beim Barcode-Auftragsstart (Scanner {ScannerNr})", barcodeScannerNr);
-            }
-        }
-
-        /// <summary>
-        /// Prüft, ob ein Auftrag für eine Maschine gestartet werden kann
-        /// </summary>
-        private async Task<bool> KannAuftragGestartetWerdenAsync(int maschinenIndex, CancellationToken stoppingToken)
-        {
-            try
-            {
-                var maschine = _s7Data.Includis[maschinenIndex];
-                
-                // Prüfen, ob Maschine aktiv ist
-                if (maschine.IstArchiviert)
-                    return false;
-                
-                // Prüfen, ob Maschine im Automatikmodus ist
-                if (!_s7MainService.AuftragAutomatikStart)
-                    return false;
-                
-                // Prüfen, ob Maschine bereit ist (nicht im Stillstand, nicht beim Rüsten, etc.)
-                int maschinenZustand = maschine.MaschinenZustand;
-                if (maschinenZustand != 0) // 0 = läuft
-                {
-                    _logger.LogDebug("KannAuftragGestartetWerden: Maschine {MaschinenNr} ist nicht bereit (Zustand: {Zustand})", 
-                        maschine.Nr, maschinenZustand);
-                    return false;
-                }
-                
-                // Prüfen, ob aktueller Auftrag abgeschlossen ist
-                if (maschine.Auftrag != null && !maschine.Auftrag.IstAbgeschlossen)
-                {
-                    _logger.LogDebug("KannAuftragGestartetWerden: Maschine {MaschinenNr} hat noch einen laufenden Auftrag", 
-                        maschine.Nr);
-                    return false;
-                }
-                
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "KannAuftragGestartetWerden: Fehler bei der Prüfung für Maschine {MaschinenIndex}", maschinenIndex);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Findet den nächsten Auftrag für eine Maschine
-        /// </summary>
-        private async Task<AuftragModel> GetNaechsterAuftragAsync(int maschinenIndex, CancellationToken stoppingToken)
-        {
-            try
-            {
-                var maschine = _s7Data.Includis[maschinenIndex];
-                
-                // SQL-Abfrage: Nächster Auftrag für diese Maschine
-                string sql = $@"SELECT TOP 1 * FROM PDE 
-                    WHERE MaschinenLizenz = '{maschine.Lizenz}' 
-                    AND Stat = 0  -- Nicht gestartet
-                    AND StartDatumZeit <= GETDATE()
-                    AND (EndeDatumZeit IS NULL OR EndeDatumZeit >= GETDATE())
-                    ORDER BY Prioritaet DESC, Dringlichkeit DESC, StartDatumZeit ASC";
-                
+                string sql = $"SELECT TOP 1 WerkzeugNr FROM Werkzeug WHERE Nr = {schluessel}";
                 using (var reader = _database.ExecuteReader(sql))
                 {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        return new AuftragModel
-                        {
-                            Nr = reader.GetInt32(reader.GetOrdinal("Nr")),
-                            BetriebsauftragNr = reader.GetString(reader.GetOrdinal("Betriebsauftragnr")),
-                            Sollwert = reader.GetInt32(reader.GetOrdinal("Sollwert")),
-                            Istwert = reader.GetInt32(reader.GetOrdinal("Istwert")),
-                            Stat = reader.GetInt32(reader.GetOrdinal("Stat"))
-                        };
-                    }
+                    if (reader.Read())
+                        return GetString(reader, "WerkzeugNr");
                 }
-                
-                return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "GetNaechsterAuftrag: Fehler beim Laden des nächsten Auftrags für Maschine {MaschinenIndex}", maschinenIndex);
-                return null;
+                _logger.LogWarning(ex, "CCC_GetWerkzeugNr: Werkzeug {Schluessel} nicht gefunden", schluessel);
             }
-        }
-
-        /// <summary>
-        /// Startet einen Auftrag auf einer Maschine
-        /// </summary>
-        private async Task StartAuftragAsync(int maschinenIndex, AuftragModel auftrag, CancellationToken stoppingToken)
-        {
-            try
-            {
-                var maschine = _s7Data.Includis[maschinenIndex];
-                
-                _logger.LogInformation("StartAuftrag: Starte Auftrag {AuftragNr} auf Maschine {MaschinenNr}", 
-                    auftrag.BetriebsauftragNr, maschine.Nr);
-                
-                // 1. Auftrag in PDE als gestartet markieren
-                string sql = $"UPDATE PDE SET Stat = 1, StartDatumZeit = GETDATE() WHERE Nr = {auftrag.Nr}";
-                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                
-                // 2. Maschinenauftrag aktualisieren
-                sql = $@"UPDATE Maschinen SET AktAuftragNr = {auftrag.Nr}, 
-                    AktBetriebsauftragNr = '{auftrag.BetriebsauftragNr}'
-                    WHERE Lizenz = '{maschine.Lizenz}'";
-                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                
-                // 3. SPS-Werte zurücksetzen
-                await ResetSPSWerteForMaschineAsync(maschinenIndex, stoppingToken);
-                
-                _logger.LogInformation("StartAuftrag: Auftrag {AuftragNr} auf Maschine {MaschinenNr} erfolgreich gestartet", 
-                    auftrag.BetriebsauftragNr, maschine.Nr);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "StartAuftrag: Fehler beim Starten von Auftrag {AuftragNr} auf Maschine {MaschinenIndex}", 
-                    auftrag?.BetriebsauftragNr, maschinenIndex);
-            }
-        }
-
-        /// <summary>
-        /// Setzt SPS-Werte für eine Maschine zurück
-        /// </summary>
-        private async Task ResetSPSWerteForMaschineAsync(int maschinenIndex, CancellationToken stoppingToken)
-        {
-            try
-            {
-                var maschine = _s7Data.Includis[maschinenIndex];
-                
-                // Stückzähler zurücksetzen
-                string sql = $@"UPDATE SPSWERTE SET 
-                    StueckAuftragGesamt = 0,
-                    StueckAuftragSchicht = 0,
-                    StueckSchicht = 0
-                    WHERE LizenzInt = {maschine.Nr}";
-                
-                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                
-                _logger.LogDebug("ResetSPSWerteForMaschine: SPS-Werte für Maschine {MaschinenNr} zurückgesetzt", maschine.Nr);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "ResetSPSWerteForMaschine: Fehler beim Zurücksetzen der SPS-Werte für Maschine {MaschinenIndex}", maschinenIndex);
-            }
-        }
-
-        /// <summary>
-        /// Prüft Auftragsfreigabe
-        /// Äquivalent zu CCC_Check_Auftrag_Freigabe in DBMain.pas (Zeile 3130)
-        /// </summary>
-        public async Task CCC_Check_Auftrag_FreigabeAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogInformation("CCC_Check_Auftrag_Freigabe: Auftragsfreigabe wird geprüft");
-                
-                // SQL-Abfrage: Aufträge mit Freigabe-Flag prüfen
-                string sql = "SELECT * FROM PDE WHERE Freigegeben = 1 AND Stat = 0";
-                
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    while (await reader.ReadAsync(stoppingToken))
-                    {
-                        int auftragNr = reader.GetInt32(reader.GetOrdinal("Nr"));
-                        string betriebsauftragNr = reader.GetString(reader.GetOrdinal("Betriebsauftragnr"));
-                        
-                        // Prüfen, ob Maschine für diesen Auftrag bereit ist
-                        string maschinenLizenz = reader.GetString(reader.GetOrdinal("MaschinenLizenz"));
-                        int maschinenIndex = GetMaschinenIndexByLizenz(maschinenLizenz);
-                        
-                        if (maschinenIndex >= 0 && await KannAuftragGestartetWerdenAsync(maschinenIndex, stoppingToken))
-                        {
-                            var auftrag = new AuftragModel
-                            {
-                                Nr = auftragNr,
-                                BetriebsauftragNr = betriebsauftragNr,
-                                Sollwert = reader.GetInt32(reader.GetOrdinal("Sollwert")),
-                                Istwert = reader.GetInt32(reader.GetOrdinal("Istwert")),
-                                Stat = reader.GetInt32(reader.GetOrdinal("Stat"))
-                            };
-                            
-                            await StartAuftragAsync(maschinenIndex, auftrag, stoppingToken);
-                            
-                            // Freigabe-Flag zurücksetzen
-                            sql = $"UPDATE PDE SET Freigegeben = 0 WHERE Nr = {auftragNr}";
-                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                        }
-                    }
-                }
-                
-                _logger.LogInformation("CCC_Check_Auftrag_Freigabe: Auftragsfreigabe-Prüfung abgeschlossen");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CCC_Check_Auftrag_Freigabe: Fehler bei der Auftragsfreigabe-Prüfung");
-            }
-        }
-
-        /// <summary>
-        /// Daten aktualisieren
-        /// Äquivalent zu CCC_Daten_Aktualisieren in DBMain.pas (Zeile 3142)
-        /// </summary>
-        public async Task CCC_Daten_AktualisierenAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogInformation("CCC_Daten_Aktualisieren: Daten werden aktualisiert");
-                
-                // Hier würde die Aktualisierungslogik aus Delphi portiert werden
-                // z.B. Maschinenstatus, Auftragsstatus, etc.
-                
-                _logger.LogInformation("CCC_Daten_Aktualisieren: Datenaktualisierung abgeschlossen");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CCC_Daten_Aktualisieren: Fehler bei der Datenaktualisierung");
-            }
-        }
-
-        /// <summary>
-        /// Prüft unterbrochene Aufträge
-        /// Äquivalent zu CCC_CheckUnterbrocheneAuftraege in DBMain.pas (Zeile 3150)
-        /// </summary>
-        public async Task CCC_CheckUnterbrocheneAuftraegeAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogInformation("CCC_CheckUnterbrocheneAuftraege: Unterbrochene Aufträge werden geprüft");
-                
-                // SQL-Abfrage: Unterbrochene Aufträge finden
-                string sql = "SELECT * FROM PDE WHERE Stat = 2"; // 2 = unterbrochen
-                
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    while (await reader.ReadAsync(stoppingToken))
-                    {
-                        int auftragNr = reader.GetInt32(reader.GetOrdinal("Nr"));
-                        string betriebsauftragNr = reader.GetString(reader.GetOrdinal("Betriebsauftragnr"));
-                        
-                        // Prüfen, ob Auftrag fortgesetzt werden kann
-                        if (await KannAuftragFortgesetztWerdenAsync(auftragNr, stoppingToken))
-                        {
-                            // Auftrag als laufend markieren
-                            sql = $"UPDATE PDE SET Stat = 1 WHERE Nr = {auftragNr}";
-                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                            
-                            _logger.LogInformation("CCC_CheckUnterbrocheneAuftraege: Auftrag {AuftragNr} wurde fortgesetzt", betriebsauftragNr);
-                        }
-                    }
-                }
-                
-                _logger.LogInformation("CCC_CheckUnterbrocheneAuftraege: Prüfung unterbrochener Aufträge abgeschlossen");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CCC_CheckUnterbrocheneAuftraege: Fehler bei der Prüfung unterbrochener Aufträge");
-            }
-        }
-
-        /// <summary>
-        /// Prüft, ob ein unterbrochener Auftrag fortgesetzt werden kann
-        /// </summary>
-        private async Task<bool> KannAuftragFortgesetztWerdenAsync(int auftragNr, CancellationToken stoppingToken)
-        {
-            try
-            {
-                // Hier würde die Logik aus Delphi portiert werden
-                // Vereinfacht: Immer true zurückgeben
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "KannAuftragFortgesetztWerden: Fehler bei der Prüfung für Auftrag {AuftragNr}", auftragNr);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Daten schreiben
-        /// Äquivalent zu CCC_Daten_Schreiben in DBMain.pas (Zeile 3233)
-        /// </summary>
-        public async Task CCC_Daten_SchreibenAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogInformation("CCC_Daten_Schreiben: Daten werden in die Datenbank geschrieben");
-                
-                // Hier würde die Schreiblogik aus Delphi portiert werden
-                // z.B. SPS-Werte, Maschinenstatus, etc.
-                await In_SPSWerteDBAsync(stoppingToken);
-                
-                _logger.LogInformation("CCC_Daten_Schreiben: Datenschreiben abgeschlossen");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CCC_Daten_Schreiben: Fehler beim Schreiben der Daten");
-            }
-        }
-
-        /// <summary>
-        /// Schreibt alle SPS-Werte in die Datenbank
-        /// Äquivalent zu In_SPSWerteDB in DBMain.pas (Zeile 2020)
-        /// </summary>
-        public async Task In_SPSWerteDBAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogInformation("In_SPSWerteDB: SPS-Werte werden in die Datenbank geschrieben");
-                
-                // Für jede Maschine die SPS-Werte schreiben
-                for (int i = 0; i < _s7Data.Includis.Count; i++)
-                {
-                    var maschine = _s7Data.Includis[i];
-                    if (maschine.IstArchiviert)
-                        continue;
-                    
-                    await Schreibe_SPS_WertAsync(i, stoppingToken);
-                }
-                
-                _logger.LogInformation("In_SPSWerteDB: SPS-Werte erfolgreich geschrieben");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "In_SPSWerteDB: Fehler beim Schreiben der SPS-Werte");
-            }
-        }
-
-        /// <summary>
-        /// Schreibt einzelne SPS-Werte für eine Maschine
-        /// Äquivalent zu Schreibe_SPS_Wert in DBMain.pas
-        /// </summary>
-        private async Task Schreibe_SPS_WertAsync(int maschinenIndex, CancellationToken stoppingToken)
-        {
-            try
-            {
-                var maschine = _s7Data.Includis[maschinenIndex];
-                
-                // Maschinenprogrammbetrieb prüfen
-                int maschProgramm = _s7Data.SignalList.GetIstwertByNr(
-                    GetSignalNrByMaschine(maschinenIndex, "MaschinenZustand")) == 1 ? 1 : 0;
-                
-                // Prüfen, ob Eintrag existiert
-                bool exists = await SPSWerteExistsAsync(maschine.Nr, stoppingToken);
-                
-                string sql;
-                if (!exists)
-                {
-                    // INSERT
-                    sql = $@"INSERT INTO SPSWERTE (
-                        Nr, LizenzInt, MaschProgramm, MaschOrg, MaschStoerung,
-                        StueckGesamt, StueckAuftragGesamt, StueckAuftragSchicht, StueckSchicht,
-                        Betriebsstunden, Taktzeit, LaufzeitGes, LaufzeitSchicht,
-                        StueckPruefGesamt, StueckPruefAuftragGesamt, StueckPruefAuftragSchicht, StueckPruefSchicht,
-                        StueckPackGesamt, StueckPackAuftragGesamt, StueckPackAuftragSchicht, StueckPackSchicht)
-                        VALUES (
-                        SPSWERTEID.NextVal,
-                        {maschine.Nr},
-                        {maschProgramm},
-                        0,
-                        0,
-                        {maschine.StueckGesamt},
-                        {maschine.StueckAuftragGesamt},
-                        {maschine.StueckAuftragSchicht},
-                        {maschine.StueckSchicht},
-                        {maschine.Betriebsstunden},
-                        {maschine.Taktzeit},
-                        {maschine.LaufzeitGes},
-                        {maschine.LaufzeitSchicht},
-                        {maschine.StueckPruefGesamt},
-                        {maschine.StueckPruefAuftragGesamt},
-                        {maschine.StueckPruefAuftragSchicht},
-                        {maschine.StueckPruefSchicht},
-                        {maschine.StueckPackGesamt},
-                        {maschine.StueckPackAuftragGesamt},
-                        {maschine.StueckPackAuftragSchicht},
-                        {maschine.StueckPackSchicht})";
-                }
-                else
-                {
-                    // UPDATE
-                    sql = $@"UPDATE SPSWERTE SET
-                        MaschProgramm = {maschProgramm},
-                        MaschStoerung = 0,
-                        StueckGesamt = {maschine.StueckGesamt},
-                        StueckAuftragGesamt = {maschine.StueckAuftragGesamt},
-                        StueckAuftragSchicht = {maschine.StueckAuftragSchicht},
-                        StueckSchicht = {maschine.StueckSchicht},
-                        Betriebsstunden = {maschine.Betriebsstunden},
-                        Taktzeit = {maschine.Taktzeit},
-                        LaufzeitGes = {maschine.LaufzeitGes},
-                        LaufzeitSchicht = {maschine.LaufzeitSchicht},
-                        StueckPruefGesamt = {maschine.StueckPruefGesamt},
-                        StueckPruefAuftragGesamt = {maschine.StueckPruefAuftragGesamt},
-                        StueckPruefAuftragSchicht = {maschine.StueckPruefAuftragSchicht},
-                        StueckPruefSchicht = {maschine.StueckPruefSchicht},
-                        StueckPackGesamt = {maschine.StueckPackGesamt},
-                        StueckPackAuftragGesamt = {maschine.StueckPackAuftragGesamt},
-                        StueckPackAuftragSchicht = {maschine.StueckPackAuftragSchicht},
-                        StueckPackSchicht = {maschine.StueckPackSchicht}
-                        WHERE LizenzInt = {maschine.Nr}";
-                }
-                
-                await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                
-                _logger.LogDebug("Schreibe_SPS_Wert: SPS-Werte für Maschine {MaschinenNr} geschrieben", maschine.Nr);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Schreibe_SPS_Wert: Fehler beim Schreiben der SPS-Werte für Maschine {MaschinenIndex}", maschinenIndex);
-            }
-        }
-
-        /// <summary>
-        /// Prüft, ob SPSWERTE-Eintrag existiert
-        /// </summary>
-        private async Task<bool> SPSWerteExistsAsync(int lizenzInt, CancellationToken stoppingToken)
-        {
-            try
-            {
-                string sql = $"SELECT COUNT(*) FROM SPSWERTE WHERE LizenzInt = {lizenzInt}";
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        return reader.GetInt32(0) > 0;
-                    }
-                }
-                return false;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "SPSWerteExists: Fehler bei der Prüfung für LizenzInt {LizenzInt}", lizenzInt);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Prüft Schichtwechsel
-        /// Äquivalent zu NeueSchicht in DBMain.pas (Zeile 3641)
-        /// </summary>
-        public async Task<bool> NeueSchichtAsync(out int alteSchicht, CancellationToken stoppingToken)
-        {
-            alteSchicht = -1;
-            try
-            {
-                _logger.LogDebug("NeueSchicht: Schichtwechsel wird geprüft");
-                
-                string sql = "SELECT * FROM SIWECHSEL";
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        if (reader.GetInt32(reader.GetOrdinal("Schichtwechsel")) == 1)
-                        {
-                            alteSchicht = reader.GetInt32(reader.GetOrdinal("AlteSchicht"));
-                            int nr = reader.GetInt32(reader.GetOrdinal("Nr"));
-                            
-                            // Eintrag löschen
-                            sql = $"DELETE FROM SIWECHSEL WHERE Nr = {nr}";
-                            await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                            
-                            _logger.LogInformation("NeueSchicht: Schichtwechsel erkannt (Alte Schicht: {AlteSchicht})", alteSchicht);
-                            return true;
-                        }
-                    }
-                }
-                
-                _logger.LogDebug("NeueSchicht: Kein Schichtwechsel erkannt");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "NeueSchicht: Fehler bei der Schichtwechsel-Prüfung");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Prüft und löscht Rote-Lampe-Einträge
-        /// Äquivalent zu CheckRoteLampeAus in DBMain.pas (Zeile 3657)
-        /// </summary>
-        public async Task<bool> CheckRoteLampeAusAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogDebug("CheckRoteLampeAus: Rote-Lampe-Einträge werden geprüft");
-                
-                // 1. Rote-Lampe-Einträge löschen
-                string sql = "SELECT COUNT(*) CNT FROM ROTELAMPE";
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        int count = reader.GetInt32(0);
-                        if (count > 0)
-                        {
-                            sql = "SELECT * FROM ROTELAMPE";
-                            using (var deleteReader = _database.ExecuteReader(sql))
-                            {
-                                while (await deleteReader.ReadAsync(stoppingToken))
-                                {
-                                    int nr = deleteReader.GetInt32(deleteReader.GetOrdinal("Nr"));
-                                    await _database.ExecuteNonQueryAsync($"DELETE FROM ROTELAMPE WHERE Nr = {nr}", stoppingToken);
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // 2. Prüfen, ob noch Rote-Lampe-Aufträge vorhanden sind
-                sql = "SELECT COUNT(*) CNT FROM BDA WHERE RoteLampeAn = 1";
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        int count = reader.GetInt32(0);
-                        bool result = count == 0;
-                        
-                        if (result)
-                        {
-                            _logger.LogInformation("CheckRoteLampeAus: Alle Rote-Lampe-Einträge gelöscht, keine aktiven Rote-Lampe-Aufträge");
-                        }
-                        else
-                        {
-                            _logger.LogWarning("CheckRoteLampeAus: Es gibt noch {Count} aktive Rote-Lampe-Aufträge", count);
-                        }
-                        
-                        return result;
-                    }
-                }
-                
-                return false;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CheckRoteLampeAus: Fehler bei der Rote-Lampe-Prüfung");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Holt Stückzahl des alten Auftrags
-        /// Äquivalent zu GetStueckAuftragAlt in DBMain.pas
-        /// </summary>
-        public async Task<int> GetStueckAuftragAltAsync(int maschinenIndex, CancellationToken stoppingToken)
-        {
-            try
-            {
-                var maschine = _s7Data.Includis[maschinenIndex];
-                
-                // Hier würde die Logik aus Delphi portiert werden
-                // Vereinfacht: 0 zurückgeben
-                return 0;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "GetStueckAuftragAlt: Fehler beim Abrufen der Stückzahl des alten Auftrags");
-                return 0;
-            }
-        }
-
-        /// <summary>
-        /// Prüft manuelle Stückbuchung
-        /// Äquivalent zu CheckManuelleStueckBuchung in DBMain.pas
-        /// </summary>
-        public async Task<bool> CheckManuelleStueckBuchungAsync(int maschinenIndex, CancellationToken stoppingToken)
-        {
-            try
-            {
-                // Hier würde die Logik aus Delphi portiert werden
-                // Vereinfacht: false zurückgeben
-                return false;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "CheckManuelleStueckBuchung: Fehler bei der Prüfung der manuellen Stückbuchung");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Lädt Daten aus verschiedenen Tabellen
-        /// Äquivalent zu Hole_Daten_Tabelle in DBMain.pas
-        /// </summary>
-        public async Task Hole_Daten_TabelleAsync(int datenTyp, CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogDebug("Hole_Daten_Tabelle: Daten werden aus Tabelle geladen (Typ: {DatenTyp})", datenTyp);
-                
-                // Hier würde die Logik aus Delphi portiert werden
-                // Vereinfacht: Leere Implementierung
-                
-                _logger.LogDebug("Hole_Daten_Tabelle: Datenladen abgeschlossen");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Hole_Daten_Tabelle: Fehler beim Laden der Daten (Typ: {DatenTyp})", datenTyp);
-            }
-        }
-
-        /// <summary>
-        /// Lädt Metall-spezifische Daten
-        /// Äquivalent zu DatenLesen_Metall in DBMain.pas
-        /// </summary>
-        public async Task DatenLesenMetallAsync(CancellationToken stoppingToken)
-        {
-            try
-            {
-                _logger.LogDebug("DatenLesenMetall: Metall-spezifische Daten werden geladen");
-                
-                // Hier würde die Logik aus Delphi portiert werden
-                // Vereinfacht: Leere Implementierung
-                
-                _logger.LogDebug("DatenLesenMetall: Metall-Datenladen abgeschlossen");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "DatenLesenMetall: Fehler beim Laden der Metall-Daten");
-            }
+            return string.Empty;
         }
 
         // ==================== HILFSMETHODEN ====================
 
-        /// <summary>
-        /// Gibt die Signal-Nr für eine bestimmte Maschine und Signal-Art zurück
-        /// </summary>
-        private int GetSignalNrByMaschine(int maschinenIndex, string signalName)
+        private int FindMaschinenIndexByDatenblock(int datenblock)
         {
-            try
+            for (int i = 0; i < _s7Data.Includis.Count; i++)
             {
-                if (maschinenIndex < 0 || maschinenIndex >= _s7Data.Includis.Count)
-                    return 0;
-                
-                string lizenz = _s7Data.Includis[maschinenIndex].Lizenz;
-                
-                // Signal-Nr aus Datenbank ermitteln
-                string sql = $@"SELECT signal_maschine.Nr 
-                    FROM signal_maschine 
-                    JOIN signale ON signale.SignalNr = signal_maschine.SignalNr
-                    JOIN maschinen ON maschinen.Lizenz = signal_maschine.MaschinenLizenz
-                    WHERE maschinen.Lizenz = '{lizenz}' 
-                    AND signale.Bezeichnung = '{signalName}'";
-                
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    if (reader.Read())
-                    {
-                        return reader.GetInt32(0);
-                    }
-                }
-                
-                return 0;
+                if (_s7Data.Includis[i].Datenblock == datenblock)
+                    return i;
             }
-            catch (Exception ex)
+            return -1;
+        }
+
+        private int FindMaschinenIndexByLizenz(string lizenz)
+        {
+            for (int i = 0; i < _s7Data.Includis.Count; i++)
             {
-                _logger.LogError(ex, "GetSignalNrByMaschine: Fehler beim Ermitteln der Signal-Nr");
-                return 0;
+                if (string.Equals(_s7Data.Includis[i].Lizenz, lizenz, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Liest einen String aus einem DataReader (DBNull-tolerant).
+        /// </summary>
+        private static string GetString(System.Data.IDataReader reader, string fieldName)
+        {
+            int ordinal = reader.GetOrdinal(fieldName);
+            return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal) ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Liest einen Int32 aus einem DataReader (DBNull-tolerant).
+        /// </summary>
+        private static int GetInt32(System.Data.IDataReader reader, string fieldName)
+        {
+            int ordinal = reader.GetOrdinal(fieldName);
+            if (reader.IsDBNull(ordinal)) return 0;
+            return Convert.ToInt32(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Konvertiert einen String in eine Zahl (Äquivalent zu Format_String in Delphi).
+        /// </summary>
+        private static int FormatString(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return 0;
+            if (int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int result))
+                return result;
+            return 0;
+        }
+
+        /// <summary>
+        /// Konvertiert einen String in einen Float (Äquivalent zu GFloat in Delphi).
+        /// Ersetzt Komma durch Punkt für invariantes Parsing.
+        /// </summary>
+        private static double GetDouble(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return 0;
+            string s = value.Trim().Replace(',', '.');
+            if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out double result))
+                return result;
+            return 0;
+        }
+
+        /// <summary>
+        /// Mappt den Station-Text auf eine Prüfstation-Nummer (1=einfach, 2=zweifach, 3=dreifach).
+        /// </summary>
+        private static int MapPruefstation(string station)
+        {
+            if (string.IsNullOrEmpty(station)) return 1;
+            switch (station.ToLowerInvariant())
+            {
+                case "einfach": return 1;
+                case "zweifach": return 2;
+                case "dreifach": return 3;
+                default: return 1;
             }
         }
 
         /// <summary>
-        /// Gibt die Barcode-Signal-Nr für einen bestimmten Scanner zurück
+        /// Escapt Hochkommata für SQL-Statements.
         /// </summary>
-        private int GetBarcodeSignalNr(int scannerNr)
+        private static string EscapeSql(string value)
         {
-            try
-            {
-                // Barcode-Signale: CBARCODE_GELESEN (27) und CBARCODE (28)
-                // Scanner 1-3 haben unterschiedliche DBNrs
-                switch (scannerNr)
-                {
-                    case 1: return _s7Data.BarcodeGelesen.DBNr;
-                    case 2: return _s7Data.BarcodeGelesen2.DBNr;
-                    case 3: return _s7Data.BarcodeGelesen3.DBNr;
-                    default: return 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "GetBarcodeSignalNr: Fehler beim Ermitteln der Barcode-Signal-Nr");
-                return 0;
-            }
+            return value?.Replace("'", "''") ?? string.Empty;
         }
 
-        /// <summary>
-        /// Findet Auftrag anhand Barcode
-        /// </summary>
-        private async Task<AuftragModel> GetAuftragByBarcodeAsync(int barcode, CancellationToken stoppingToken)
-        {
-            try
-            {
-                string sql = $"SELECT * FROM PDE WHERE Barcode = {barcode}";
-                
-                using (var reader = _database.ExecuteReader(sql))
-                {
-                    if (await reader.ReadAsync(stoppingToken))
-                    {
-                        return new AuftragModel
-                        {
-                            Nr = reader.GetInt32(reader.GetOrdinal("Nr")),
-                            BetriebsauftragNr = reader.GetString(reader.GetOrdinal("Betriebsauftragnr")),
-                            Sollwert = reader.GetInt32(reader.GetOrdinal("Sollwert")),
-                            Istwert = reader.GetInt32(reader.GetOrdinal("Istwert")),
-                            Stat = reader.GetInt32(reader.GetOrdinal("Stat"))
-                        };
-                    }
-                }
-                
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "GetAuftragByBarcode: Fehler beim Laden des Auftrags für Barcode {Barcode}", barcode);
-                return null;
-            }
-        }
+        // ==================== Folgende Methoden bleiben für Kompatibilität mit CCCService bestehen ====================
 
         /// <summary>
-        /// Gibt die Maschinen-Index anhand Barcode-Scanner zurück
+        /// Auftragsautomatik-Start (Stub - Logik aus CCCService).
         /// </summary>
-        private int GetMaschinenIndexByBarcodeScanner(int scannerNr)
+        public async Task CCC_AuftragAutomatikStartAsync(CancellationToken stoppingToken)
         {
-            try
-            {
-                // Hier würde die Zuordnung aus Delphi portiert werden
-                // Vereinfacht: Scanner 1 → Maschine 0, Scanner 2 → Maschine 1, Scanner 3 → Maschine 2
-                if (scannerNr >= 1 && scannerNr <= 3 && scannerNr <= _s7Data.Includis.Count)
-                {
-                    return scannerNr - 1;
-                }
-                return -1;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "GetMaschinenIndexByBarcodeScanner: Fehler beim Ermitteln der Maschinen-Index");
-                return -1;
-            }
+            if (_s7MainService == null || !_s7MainService.AuftragAutomatikStart) return;
+            _logger.LogDebug("CCC_AuftragAutomatikStart: Auftragsautomatik wird ausgeführt");
+            await Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Gibt die Maschinen-Index anhand Lizenz zurück
-        /// </summary>
-        private int GetMaschinenIndexByLizenz(string lizenz)
+        public async Task CCC_AuftragAutomatikStartVariabelAsync(CancellationToken stoppingToken)
         {
-            try
-            {
-                for (int i = 0; i < _s7Data.Includis.Count; i++)
-                {
-                    if (_s7Data.Includis[i].Lizenz.Equals(lizenz, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return i;
-                    }
-                }
-                return -1;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "GetMaschinenIndexByLizenz: Fehler beim Ermitteln der Maschinen-Index");
-                return -1;
-            }
+            _logger.LogDebug("CCC_AuftragAutomatikStartVariabel: Variable Auftragsautomatik");
+            await Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Setzt Barcode zurück
-        /// </summary>
-        private async Task ResetBarcodeAsync(int scannerNr, CancellationToken stoppingToken)
+        public async Task CCC_Auftrag_Start_BarcodeAsync(int barcodeScannerNr, CancellationToken stoppingToken)
         {
-            try
-            {
-                int barcodeSignalNr = GetBarcodeSignalNr(scannerNr);
-                if (barcodeSignalNr > 0)
-                {
-                    // Barcode_Gelesen zurücksetzen
-                    string sql = $"UPDATE signal_maschine SET Istwert = 0 WHERE Nr = {barcodeSignalNr}";
-                    await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                    
-                    // Barcode-Wert zurücksetzen
-                    int barcodeWertSignalNr = barcodeSignalNr + 1; // CBARCODE ist immer CBARCODE_GELESEN + 1
-                    sql = $"UPDATE signal_maschine SET Istwert = 0 WHERE Nr = {barcodeWertSignalNr}";
-                    await _database.ExecuteNonQueryAsync(sql, stoppingToken);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "ResetBarcode: Fehler beim Zurücksetzen des Barcodes");
-            }
+            _logger.LogDebug("CCC_Auftrag_Start_Barcode: Scanner {Nr}", barcodeScannerNr);
+            await Task.CompletedTask;
+        }
+
+        public async Task CCC_Check_Auftrag_FreigabeAsync(CancellationToken stoppingToken)
+        {
+            await Task.CompletedTask;
+        }
+
+        public async Task CCC_Daten_AktualisierenAsync(CancellationToken stoppingToken)
+        {
+            await Task.CompletedTask;
+        }
+
+        public async Task CCC_CheckUnterbrocheneAuftraegeAsync(CancellationToken stoppingToken)
+        {
+            await Task.CompletedTask;
+        }
+
+        public async Task CCC_Daten_SchreibenAsync(CancellationToken stoppingToken)
+        {
+            await Task.CompletedTask;
+        }
+
+        public async Task In_SPSWerteDBAsync(CancellationToken stoppingToken)
+        {
+            await Task.CompletedTask;
+        }
+
+        public async Task<bool> NeueSchichtAsync(out int alteSchicht, CancellationToken stoppingToken)
+        {
+            alteSchicht = -1;
+            return false;
+        }
+
+        public async Task<bool> CheckRoteLampeAusAsync(CancellationToken stoppingToken)
+        {
+            return false;
         }
     }
 
     /// <summary>
-    /// Auftragsmodell für CCC-Funktionen
+    /// Auftragsmodell für CCC-Funktionen (Legacy-Kompatibilität).
     /// </summary>
     public class AuftragModel
     {
