@@ -175,20 +175,14 @@ MadIsBack__INCL/
 
 ## 🚧 Offene Punkte
 
-### Bekanntes Blocker-Problem: Build nicht kompilierbar
-Das C#-Projekt lässt sich aktuell **nicht** kompilieren. Der gesamte C#-Code (S7MainService_CCC.cs, ArbeitUtils*.cs, SQLHelper.cs, etc.) verwendet eine API, die nicht zur CommonDB-Bibliothek passt:
-- `_database.ExecuteReader(sql)` → CommonDB bietet nur `GetReader(sql)` / `GetCommonReader(sql)`
-- `reader.ReadAsync(stoppingToken)` → CommonReader bietet nur synchrones `Read()`
-- `_database.ExecuteNonQueryAsync(sql, stoppingToken)` → CommonDB bietet nur synchrones `ExecuteNonQuery(sql)`
+### Build-Kompatibilität (behoben)
+Die C#-Services nutzen eine async-API (`ExecuteReader`, `ReadAsync(token)`, `ExecuteNonQueryAsync`), die nicht nativ in CommonDB enthalten ist. Dies wurde durch **Extension-Methods** in `commondb/CommonDbExtensions.cs` gelöst (aus Branch `vibe/ccc-init-and-build-fixes-bfbec8` gemergt):
+- `ExecuteReader` als Alias für `GetReader`
+- `ReadAsync(CancellationToken)` als Wrapper um synchrones `Read()`
+- `ExecuteNonQueryAsync(string, CancellationToken)` als Wrapper um `ExecuteNonQuery`
+- `LogStub.cs` als Logging-Ersatz für CommonDB-interne Logger
 
-**Lösungsmöglichkeiten:**
-1. **Extension-Methods hinzufügen** in `commondb/CommonDbExtensions.cs`:
-   - `ExecuteReader` als Alias für `GetReader`
-   - `ReadAsync(CancellationToken)` als `Task.Run(() => reader.Read())`-Wrapper
-   - `ExecuteNonQueryAsync(string, CancellationToken)` als Wrapper um `ExecuteNonQuery`
-2. **Oder gesamten C#-Code umstellen** auf die native CommonDB-API (`GetReader`, `Read`, `ExecuteNonQuery`).
-
-> Hinweis: dotnet SDK ist in der Sandbox nicht installiert, daher kann der Build nicht verifiziert werden.
+> Hinweis: dotnet SDK ist in der Sandbox nicht installiert, daher konnte der Build nicht verifiziert werden. Lokal mit `dotnet build` prüfen.
 
 ### CCC_*-Funktionen (Priority 1 – produktionskritisch, nur CCC_Init ist vollständig)
 Folgende CCC-Funktionen aus `arbeit.pas` sind in `S7MainService_CCC.cs` aktuell nur als **Stubs** vorhanden und müssen portiert werden:
