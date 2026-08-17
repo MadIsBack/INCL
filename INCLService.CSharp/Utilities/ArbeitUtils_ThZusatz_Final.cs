@@ -1,3 +1,4 @@
+using INCLService.CSharp.Services;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Logging;
@@ -13,11 +14,11 @@ namespace INCLService.CSharp.Utilities
     /// </summary>
     public class ArbeitUtilsThZusatzFinal
     {
-        private readonly ILogger<ArbeitUtilsThZusatzFinal> _logger;
+        private readonly ILogger _logger;
         private readonly CommonDB _database;
         private readonly ArbeitUtils _arbeitUtils;
         
-        public ArbeitUtilsThZusatzFinal(ILogger<ArbeitUtilsThZusatzFinal> logger, CommonDB database, ArbeitUtils arbeitUtils)
+        public ArbeitUtilsThZusatzFinal(ILogger logger, CommonDB database, ArbeitUtils arbeitUtils)
         {
             _logger = logger;
             _database = database;
@@ -409,7 +410,7 @@ namespace INCLService.CSharp.Utilities
                         {
                             sql = $@"INSERT INTO Stillstand (MaschineNr, StillstandNr, Kommt, Geht, Gebucht, Grund) 
                                 VALUES ((SELECT Nr FROM Maschinen WHERE Lizenz = '{lizenz}'), 
-                                        100, GETDATE(), DATEADD(hour, 1, GETDATE()), 1, 'Werkzeugwartung {Werkzeug}')";
+                                        100, GETDATE(), DATEADD(hour, 1, GETDATE()), 1, 'Werkzeugwartung {werkzeug}')";
                             await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                         }
                         

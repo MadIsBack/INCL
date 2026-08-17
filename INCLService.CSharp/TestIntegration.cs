@@ -110,8 +110,7 @@ namespace INCLService.CSharp
                 _logger.LogInformation("✅ CCC_InitAsync: Erfolgreich");
                 
                 // Test 2: NeueSchicht
-                int alteSchicht;
-                bool schichtwechsel = await ccc.NeueSchichtAsync(out alteSchicht, stoppingToken);
+                var (schichtwechsel, alteSchicht) = await ccc.NeueSchichtAsync(stoppingToken);
                 _logger.LogInformation("✅ NeueSchichtAsync: Schichtwechsel = {Schichtwechsel}, AlteSchicht = {AlteSchicht}", 
                     schichtwechsel, alteSchicht);
                 

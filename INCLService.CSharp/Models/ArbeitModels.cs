@@ -81,6 +81,12 @@ namespace INCLService.CSharp.Models
         public int GesamtLaufzeit { get; set; } = 0;
         public string BaNrLaufzeit { get; set; } = string.Empty;
         public bool Mustern { get; set; } = false;
+
+        /// <summary>
+        /// True, wenn der Auftrag abgeschlossen ist (Stat 1 = erledigt, 3 = abgebrochen).
+        /// Entspricht der Pruefung auf abgeschlossene Auftraege in Delphi.
+        /// </summary>
+        public bool IstAbgeschlossen => Stat == 1 || Stat == 3;
     }
 
     /// <summary>

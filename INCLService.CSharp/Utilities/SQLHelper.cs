@@ -11,7 +11,7 @@ namespace INCLService.CSharp.Utilities
     /// </summary>
     public class SQLHelper : IDisposable
     {
-        private readonly ILogger<SQLHelper> _logger;
+        private readonly ILogger _logger;
         private readonly CommonDB _database;
         
         // Tag-Konstanten für Logging (wie in Delphi)
@@ -19,7 +19,7 @@ namespace INCLService.CSharp.Utilities
         public const int TAG_ADDON = 1;
         public const int TAG_SHIFT = 2;
         
-        public SQLHelper(ILogger<SQLHelper> logger, CommonDB database)
+        public SQLHelper(ILogger logger, CommonDB database)
         {
             _logger = logger;
             _database = database ?? throw new ArgumentNullException(nameof(database));

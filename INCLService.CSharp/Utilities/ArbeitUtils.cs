@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Globalization;
 using System.Threading.Tasks;
 
 namespace INCLService.CSharp.Utilities
@@ -14,7 +15,7 @@ namespace INCLService.CSharp.Utilities
     /// </summary>
     public class ArbeitUtils
     {
-        private readonly ILogger<ArbeitUtils> _logger;
+        private readonly ILogger _logger;
         private readonly CommonDB _database;
         
         // Minuten pro Tag
@@ -26,7 +27,7 @@ namespace INCLService.CSharp.Utilities
         // Kalender-Gruppen
         public const int HALBAUTOMATIKKALENDER = 2;
         
-        public ArbeitUtils(ILogger<ArbeitUtils> logger, CommonDB database)
+        public ArbeitUtils(ILogger logger, CommonDB database)
         {
             _logger = logger;
             _database = database;
@@ -101,10 +102,9 @@ namespace INCLService.CSharp.Utilities
                 int gruppe = 1;
                 
                 // Versuchen, die Gruppe aus der Maschinen-Tabelle zu lesen
-                using (var reader = _database.ExecuteReader(
-                    "SELECT KalenderGruppe FROM Maschinen WHERE Lizenz = @Lizenz"))
+                string sql = "SELECT KalenderGruppe FROM Maschinen WHERE Lizenz = '" + lizenz.Replace("'", "''") + "'";
+                using (var reader = _database.ExecuteReader(sql))
                 {
-                    reader.Parameters.AddWithValue("@Lizenz", lizenz);
                     if (reader.Read())
                     {
                         gruppe = reader.GetInt32(0);
@@ -336,6 +336,65 @@ namespace INCLService.CSharp.Utilities
                 _logger.LogError(ex, "Error in CheckPackSchicht");
                 return 0;
             }
+        }
+
+        // =====================================================================
+        // Statische Hilfsfunktionen (vgl. arbeit.pas / MainDll.pas)
+        // Werden u.a. von CCC_Init benoetigt.
+        // =====================================================================
+
+        /// <summary>
+        /// Konvertiert einen String sicher in einen Integer.
+        /// Leere Strings und nicht-numerische Werte ergeben 0.
+        /// Aequivalent zu Format_String in arbeit.pas.
+        /// </summary>
+        public static int Format_String(string wert)
+        {
+            if (string.IsNullOrWhiteSpace(wert))
+                return 0;
+
+            string s = wert.Trim();
+            if (int.TryParse(s, out int result))
+                return result;
+
+            // Fallback: Delphi StrToInt wirft bei nicht-numerischen Werten;
+            // Format_String faengt das und liefert 0.
+            return 0;
+        }
+
+        /// <summary>
+        /// Konvertiert einen String in einen Double (Float).
+        /// Behandelt sowohl Komma- als auch Punkt-Dezimaltrennzeichen.
+        /// Aequivalent zu GFloat in arbeit.pas.
+        /// </summary>
+        public static double GFloat(string h)
+        {
+            if (string.IsNullOrWhiteSpace(h))
+                return 0;
+
+            string s = h.Trim();
+
+            // TDateTime-Werte werden in Delphi als Float (OA-Datum) gespeichert.
+            if (s.Contains(",") && !s.Contains("."))
+                s = s.Replace(",", ".");
+            else if (s.Contains(",") && s.Contains("."))
+                s = s.Replace(",", "");
+
+            if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double result))
+                return result;
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Sprach-Uebersetzung fuer feststehende Texte.
+        /// Aequivalent zu GetL in Sprache_V63.pas. Im C#-Port wird (vorerst)
+        /// der uebergebene Schluesselwert direkt zurueckgegeben, da die
+        /// mehrsprachige Ressourcenverwaltung nicht Teil dieser Konvertierung ist.
+        /// </summary>
+        public static string GetL(string key)
+        {
+            return key ?? string.Empty;
         }
     }
 }

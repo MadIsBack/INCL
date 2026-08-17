@@ -583,7 +583,7 @@ namespace INCLService.CSharp.Services
             }
         }
 
-        private async Task Timer1TimerAsync(CancellationToken stoppingToken, S7MainServiceCCC ccc)
+        private async Task Timer1TimerAsync(CancellationToken stoppingToken, S7MainServiceCCC ccc = null)
         {
             try
             {
@@ -615,8 +615,8 @@ namespace INCLService.CSharp.Services
                 await ccc.In_SPSWerteDBAsync(stoppingToken);
                 
                 // Schichtwechsel prüfen
-                int alteSchicht;
-                if (await ccc.NeueSchichtAsync(out alteSchicht, stoppingToken))
+                var (schichtwechsel, alteSchicht) = await ccc.NeueSchichtAsync(stoppingToken);
+                if (schichtwechsel)
                 {
                     _logger.LogInformation("Schichtwechsel erkannt: Alte Schicht = {AlteSchicht}", alteSchicht);
                 }

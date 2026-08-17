@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Data.Common;
 using System.Data;
 using System.Collections.Generic;
@@ -15,6 +15,8 @@ namespace INCLUDIS.Utils.CommonDB
         public DbDataReader Reader;
         private readonly CommonCommand _command;
         public CommonCommand Command { get { return _command; } }
+        /// <summary>Parameter-Collection des zugrundeliegenden Commands.</summary>
+        public System.Data.Common.DbParameterCollection Parameters { get { return _command?.Command?.Parameters; } }
         //private readonly DataTable _table;
         public static Log.Log Log;
 
@@ -29,7 +31,7 @@ namespace INCLUDIS.Utils.CommonDB
         /// <summary>
         /// Konstruktor der Klasse
         /// </summary>
-        /// <param name="cmd">DbCommand das übergeben wird.</param>
+        /// <param name="cmd">DbCommand das Ã¼bergeben wird.</param>
         public CommonReader(CommonCommand cmd, CommandBehavior? behaviour = null)
         {
             _command = cmd;            
@@ -381,7 +383,7 @@ namespace INCLUDIS.Utils.CommonDB
             {
                 o = GetField(fieldName);
 
-                // auf oracle kommt hier ein string  zurück, auf sql server kommt direkt eine guid
+                // auf oracle kommt hier ein string  zurÃ¼ck, auf sql server kommt direkt eine guid
                 if (Command !=  null)
                     if (Command.DbType == CommonDB.DatabaseType.dtOracleNet ||
                         Command.DbType == CommonDB.DatabaseType.dtOracle)

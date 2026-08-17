@@ -99,7 +99,7 @@ namespace INCLService.CSharp.Services
             _s7Data = data;
             if (_ccc != null)
             {
-                _ccc = new S7MainServiceCCC(_logger, _database, null);
+                _ccc = new S7MainServiceCCC(_logger, _database, null, _configuration);
             }
         }
 
@@ -140,7 +140,7 @@ namespace INCLService.CSharp.Services
                 }
                 
                 // CCC-Funktionen initialisieren
-                _ccc = new S7MainServiceCCC(_logger, _database, null);
+                _ccc = new S7MainServiceCCC(_logger, _database, null, _configuration);
                 await _ccc.CCC_InitAsync(stoppingToken);
 
                 // Barcode-Scanner initialisieren
@@ -199,8 +199,8 @@ namespace INCLService.CSharp.Services
                 await _ccc.In_SPSWerteDBAsync(stoppingToken);
                 
                 // Schichtwechsel prüfen
-                int alteSchicht;
-                if (await _ccc.NeueSchichtAsync(out alteSchicht, stoppingToken))
+                var (schichtwechsel, alteSchicht) = await _ccc.NeueSchichtAsync(stoppingToken);
+                if (schichtwechsel)
                 {
                     _logger.LogInformation("CCCService: Schichtwechsel erkannt (Alte Schicht: {AlteSchicht})", alteSchicht);
                 }

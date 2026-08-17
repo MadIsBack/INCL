@@ -1755,7 +1755,7 @@ Diese Analyse identifiziert alle fehlenden Komponenten und priorisiert sie für 
 **Neue Datei erstellt mit allen CCC-Funktionen aus DBMain.pas:**
 
 #### **Initialisierungsfunktionen:**
-- ✅ **`CCC_InitAsync`** - Initialisiert die CCC-Funktionen (Äquivalent zu CCC_Init in DBMain.pas, Zeile 3058)
+- ✅ **`CCC_InitAsync`** - Initialisiert die CCC-Funktionen (Äquivalent zu CCC_Init in arbeit.pas, Zeile 438). **Vollständig portiert**: Lädt Maschinen-Stammdaten aus Tabelle 'Maschine' in die Includis-Liste, Schichtlaufzeiten (tpm_schicht), aktuelle Aufträge (PDE) inkl. Kavitäts-Logik (kavprot), BDE-Daten (MDE), Taktoption, TPM-Stillstandsdefinitionen und HochlaufTPM-MaschZustand. Feature-Flags werden aus appsettings.json geladen.
 - ✅ **`CCC_SchreibeSystemIDAsync`** - Schreibt die System-ID (Äquivalent zu CCC_SchreibeSystemID, Zeile 2958)
 - ✅ **`CCC_CheckLicensesAsync`** - Prüft die Lizenzen (Äquivalent zu CCC_CheckLicenses, Zeile 2959)
 
@@ -2172,6 +2172,76 @@ Diese Analyse identifiziert alle fehlenden Komponenten und priorisiert sie für 
 2. Multi-Architektur-Builds (x64, ARM64)
 3. Docker Compose für Testumgebung
 
+## 🏗️ Build-Korrektur & CCC_Init-Vollständigung
+
+### Problem
+Die bisherigen Schritte (19–25) haben C#-Code erzeugt, der **nie tatsächlich kompiliert** wurde, da das `commondb`-Projekt auf .NET Framework 4.7.2 targetierte und ein fehlendes `INCLUDIS.Utils.Log`-Projekt referenzierte. Dadurch waren zahlreiche Compile-Fehler unentdeckt.
+
+### Durchgeführte Korrekturen
+
+#### commondb-Bibliothek
+- **csproj auf net8.0 SDK-style umgestellt** (altes non-SDK .NET Framework 4.7.2 csproj ersetzt).
+- **`LogStub.cs` neu erstellt** — ersetzt das fehlende `INCLUDIS.Utils.Log`-Projekt mit:
+  - `Log`-Klasse (LogSome, LogException, LogCallStack)
+  - `DLLBase`-Basisklasse (Connected, UserName, Password, Server, InitialCatalog, SqlProvider, LogException, HandleDBException)
+- **`CommonDbExtensions.cs` erweitert** um `ExecuteReader`, `CreateCommand`, `ExecuteNonQueryAsync`, `ReadAsync` (Erweiterungsmethoden, die im Dienst als `_database.ExecuteReader(sql)` etc. genutzt werden).
+- **`CommonReader.cs`** um `Parameters`-Property ergänzt.
+- **`CommonDB.cs`**: parameterloser Konstruktor hinzugefügt; ungenutzte `System.ServiceProcess`/`System.Management`-usings entfernt.
+- WinForms-Designer-Dateien (`CommonDbControl*`) vom Build ausgeschlossen.
+
+#### CCC_Init vollständig portiert (`S7MainService_CCC.cs`)
+- `CCC_InitAsync` portiert die komplette `CCC_Init`-Prozedur aus `arbeit.pas` (Zeile 438):
+  1. Maschinen-Stammdaten aus Tabelle `Maschine` → `Includis`-Liste
+  2. Auftragsfelder zurücksetzen
+  3. Schichtlaufzeiten aus `tpm_schicht`
+  4. Aufräum-Updates (PDE/MaschInf)
+  5. Aktuelle Aufträge (PDE) mit Kavitäts-Logik (kavprot)
+  6. Maschinen ohne Auftrag zurücksetzen (`stgeplantInt = 2`)
+  7. Unterbrochene Aufträge (`INCL_MJAInterruptedDescr`)
+  8. BDE-Daten (MDE)
+  9. `saveeverycycle` + Taktoption → ArtikelZyklus
+  10. TPM-Stillstandsdefinitionen
+  11. HochlaufTPM → MaschZustand-Initialisierung
+- Neue Helfer: `StGeplantInt`, `GetSetupParamBoolAsync`, `CCC_GetMaschNrLizenzAsInt`, `CCC_GetWerkzeugNr`.
+- Feature-Flags aus `appsettings.json` geladen.
+
+#### Weitere vorbestehende Compile-Fehler behoben
+- **`NeueSchichtAsync`**: `out`-Parameter aus async-Methode entfernt → `Task<(bool, int)>`; alle Aufrufer angepasst.
+- **`Auftrag.IstAbgeschlossen`**-Property zu `ArbeitModels.cs` hinzugefügt.
+- **Duplikate** (`SignalMaschineItem/List`, `MaschinenDaten`, `S7MainData`) aus `SPSModels.cs` entfernt.
+- **Obsolete `InitializeS7Data`** aus `S7MainService_Extensions.cs` entfernt.
+- **ILogger-Typ-Kompatibilität**: Utility-Logger auf non-generic `ILogger` umgestellt.
+- **`Math.Max(DateTime)`** durch bedingte Ausdrücke ersetzt.
+- **`TPM_KorrekturAsync`**-Stub zu `TPM.cs` hinzugefügt.
+- **`Timer1TimerAsync`** `ccc`-Parameter optional gemacht.
+- **Mehrzeilige interpolated strings** zu verbatim (`$@"`) korrigiert.
+- **Null-Byte** in `Program.cs` entfernt; Serilog-Pakete ergänzt.
+- **`Status_BeschreibungAsync`** zu `ArbeitUtils_ThZusatz.cs` portiert.
+- **Case-sensitive Interpolationsvariablen** (`{Werkzeug}` → `{werkzeug}`) korrigiert.
+- **`GetValue<int?>`** durch `IsDBNull`/`GetInt32` ersetzt.
+
+### Neue/Geänderte Dateien
+| Datei | Änderung |
+|-------|----------|
+| `commondb/LogStub.cs` | Neu: Log/DLLBase-Stub |
+| `commondb/INCLUDIS.Utils.CommonDB.csproj` | net8.0 SDK-style |
+| `commondb/CommonDbExtensions.cs` | ExecuteReader/CreateCommand/etc. |
+| `commondb/CommonDB.cs` | Parameterloser Konstruktor |
+| `commondb/CommonReader.cs` | Parameters-Property |
+| `INCLService.CSharp/Services/S7MainService_CCC.cs` | CCC_Init vollständige Portierung |
+| `INCLService.CSharp/Models/S7MainModels.cs` | MaschinenDaten erweitert, StillstandDefinition, MaschZustandItem |
+| `INCLService.CSharp/Models/ArbeitModels.cs` | IstAbgeschlossen-Property |
+| `INCLService.CSharp/Models/SPSModels.cs` | Duplikate entfernt |
+| `INCLService.CSharp/Utilities/ArbeitUtils.cs` | Format_String, GFloat, GetL |
+| `INCLService.CSharp/Utilities/ArbeitUtils_ThZusatz.cs` | Status_BeschreibungAsync, Math.Max-Fix |
+| `INCLService.CSharp/INCLService.CSharp.csproj` | Serilog-Pakete, net8.0-Konfiguration |
+| `INCLService.CSharp/appsettings.json` | Neue Feature-Flags |
+
+### Build-Status
+**`dotnet build` der kompletten Lösung (commondb + INCLService.CSharp) unter .NET 8.0: ✅ 0 Fehler, 0 Warnungen**
+
+Verifiziert mit .NET 8.0.424 SDK. Alle Services (MainService, CCCService, ShiftService, SignalLogService, DBBackupService, AdditionalService) kompilieren und sind registriert.
+
 ## 📌 Projektabschluss
 
 ### Zusammenfassung
@@ -2185,7 +2255,7 @@ Diese Analyse identifiziert alle fehlenden Komponenten und priorisiert sie für 
 - **Dateien**: ~30 C#-Dateien
 - **Zeilen Code**: ~150.000 (Delphi) → ~50.000 (C#)
 - **Services**: 7 BackgroundServices
-- **Fortschritt**: 100%
+- **Fortschritt**: ~90% (CCC_Init vollständig portiert, Build lauffähig; weitere CCC_*-Funktionen und ThZusatz-Details folgen)
 
 ### Offene Punkte (optional)
 - Docker-Container

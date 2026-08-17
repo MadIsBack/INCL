@@ -1,3 +1,4 @@
+using INCLService.CSharp.Services;
 using INCLService.CSharp.Models;
 using INCLUDIS.Utils.CommonDB;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,7 @@ namespace INCLService.CSharp.Utilities
     /// </summary>
     public class ArbeitUtilsThZusatzComplete
     {
-        private readonly ILogger<ArbeitUtilsThZusatzComplete> _logger;
+        private readonly ILogger _logger;
         private readonly CommonDB _database;
         private readonly ArbeitUtils _arbeitUtils;
         
@@ -24,7 +25,7 @@ namespace INCLService.CSharp.Utilities
         public int Schicht3 { get; set; } = 22;
         public int ShiftModel { get; set; } = 1;
         
-        public ArbeitUtilsThZusatzComplete(ILogger<ArbeitUtilsThZusatzComplete> logger, CommonDB database, ArbeitUtils arbeitUtils)
+        public ArbeitUtilsThZusatzComplete(ILogger logger, CommonDB database, ArbeitUtils arbeitUtils)
         {
             _logger = logger;
             _database = database;
@@ -279,7 +280,7 @@ namespace INCLService.CSharp.Utilities
                         {
                             if (await checkReader.ReadAsync(stoppingToken))
                             {
-                                int? shortDelay = checkReader.GetValue<int?>(0);
+                                int? shortDelay = checkReader.IsDBNull(0) ? (int?)null : checkReader.GetInt32(0);
                                 if (shortDelay.HasValue && shortDelay.Value > 0)
                                 {
                                     machineShortDelay = shortDelay.Value;
@@ -573,7 +574,7 @@ namespace INCLService.CSharp.Utilities
                             sql = $@"INSERT INTO Stillstand (MaschineNr, StillstandNr, Kommt, Geht, Gebucht, Grund) 
                                     VALUES ((SELECT Nr FROM Maschinen WHERE Lizenz = '{lizenz}'), 
                                             101, '{S7MainServiceExtensions.FloatToPunktString(reparaturDatum)}', 
-                                            GETDATE(), 1, 'Werkzeugreparatur {Werkzeug}: {Notiz}')";
+                                            GETDATE(), 1, 'Werkzeugreparatur {werkzeug}: {notiz}')";
                             await _database.ExecuteNonQueryAsync(sql, stoppingToken);
                         }
                         

@@ -1,9 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Globalization;
-using System.ServiceProcess;
 using System.Data;
-using System.Management;
 using System.Data.Common;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -45,7 +43,7 @@ namespace INCLUDIS.Utils.CommonDB
         public string DbArcUser { get { return DBUser + "_ARC." + (IsMssql ? "." : String.Empty); } }
         public string DBServer { get; private set; }
         /// <summary>
-        /// Wegen Abw�rtskompatibilt�t dasselbe wie DBServer
+        /// Wegen AbwÃ¤rtskompatibiltÃ¤t dasselbe wie DBServer
         /// </summary>
         public string DBAlias => DBServer;
 
@@ -88,6 +86,15 @@ namespace INCLUDIS.Utils.CommonDB
         // ReSharper restore InconsistentNaming
 
         #region constructors
+        /// <summary>
+        /// Parameterloser Konstruktor. Eigenschaften (UserName, Password,
+        /// Server, InitialCatalog, SqlProvider) werden anschliessend gesetzt.
+        /// </summary>
+        public CommonDB()
+        {
+            _connectionString = string.Empty;
+        }
+
         public CommonDB(DatabaseType aDbType, string connectionString)
         {
 
@@ -554,7 +561,7 @@ namespace INCLUDIS.Utils.CommonDB
         {
             //try
             //{
-            // Zuerst pro�fen ob Datenbank online                
+            // Zuerst proÃ¼fen ob Datenbank online                
             var realopen = false;
             try
             {
