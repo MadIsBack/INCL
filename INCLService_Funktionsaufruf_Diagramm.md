@@ -1,7 +1,8 @@
-# 📋 INCLService & Komponenten_V63 - Funktionsaufruf-Diagramm
+# 📋 INCLService & Komponenten_V63 - Funktionsaufruf-Diagramm (Korrigiert)
 
-**Erstellt am:** `$(date)`
+**Erstellt am:** 19.08.2026
 **Zweck:** Übersicht über alle Funktionen, deren Aufrufreihenfolge und auslösende Ereignisse in den Verzeichnissen `INCLService` und `Komponenten_V63`.
+**Hinweis:** Diese Version enthält **korrigierte Mermaid-Diagramme** (Abschnitte 3.1, 3.2, 3.3, 4.1, 5.1, 6.1, 10.1).
 
 ---
 
@@ -48,7 +49,7 @@ graph TD
     
     %% Service-Events
     O[ServiceBeforeInstall] --> P[SetDBUser]
-    O --> Q[DisplayName := SERVICE_DISPLAY_NAME + DBUser]
+    O --> Q[DisplayName := SERVICE_DISPLAY_NAME + UpperCase(DBUser)]
     R[ServiceCreate] --> P
     S[ServiceDestroy] --> T[SchreibeMeldung 'Service Stop']
     U[ServiceShutdown] --> V[SchreibeMeldung 'Service Shutdown']
@@ -64,7 +65,7 @@ graph TD
 graph TD
     %% TS7Main.Create
     A1[TS7Main.Create] --> B1[ErrorCount := 0]
-    B1 --> C1[INCLUDIS_HOME := aus Ini Main-Home]
+    B1 --> C1[INCLUDIS_HOME := Ini.ReadString('Main', 'Home')]
     C1 --> D1[Hochlauf := True]
     D1 --> E1[First_Lauf := True]
     E1 --> F1[Daten_Enabled := True]
@@ -77,7 +78,7 @@ graph TD
     L1 --> M1[S7_Auftrag := TCO_Auftrag.Create]
     M1 --> N1[INC_Meldung := TCO_INCMeldung.Create]
     N1 --> O1[INC_Meldung.Anmelden]
-    O1 --> P1[SetLength Includis, Anzahl_Masch + 1]
+    O1 --> P1[SetLength(Includis, Anzahl_Masch + 1)]
     P1 --> Q1[InitAddr]
     Q1 --> R1[K_Init]
     R1 --> S1[CCC_SetSchichtKonstante]
@@ -159,46 +160,46 @@ graph TD
     E3 -->|Ja| H3[HochlaufTPM := True]
     
     D3 --> I3[for I := 1 to Anzahl_Masch]
-    I3 --> J3{Includis[I]_IstArchiviert?}
+    I3 --> J3[if Includis[I].IstArchiviert]
     J3 -->|Ja| K3[Continue]
     J3 -->|Nein| L3[Masch := TTT_GetMaschine(I)]
     
     L3 --> M3[if BCD_Schalter]
-    M3 -->|Ja| N3[BCD_Read(I).Istwert := ...]
+    M3 -->|Ja| N3[BCD_Read[I].Istwert := GetSignalValue]
     
-    L3 --> O3[if HandAuto(I).Istwert]
-    O3 -->|Ja| P3[MaschProgrammbetrieb(I).Istwert := ...]
+    L3 --> O3[if HandAuto[I].Istwert]
+    O3 -->|Ja| P3[MaschProgrammbetrieb[I].Istwert := GetSignalValue]
     
-    L3 --> Q3[StueckGesamt[I].Istwert := ...]
-    Q3 --> R3[StueckAuftragGesamt[I].Istwert := ...]
-    R3 --> S3[StueckAuftragSchicht[I].Istwert := ...]
-    S3 --> T3[StueckSchicht[I].Istwert := ...]
-    T3 --> U3[Betriebsstunden[I].Istwert := ...]
-    U3 --> V3[Taktzeit[I].Istwert := ...]
-    V3 --> W3[LaufzeitGes[I].Istwert := ...]
-    W3 --> X3[LaufzeitSchicht[I].Istwert := ...]
+    L3 --> Q3[StueckGesamt[I].Istwert := GetSignalValue]
+    Q3 --> R3[StueckAuftragGesamt[I].Istwert := GetSignalValue]
+    R3 --> S3[StueckAuftragSchicht[I].Istwert := GetSignalValue]
+    S3 --> T3[StueckSchicht[I].Istwert := GetSignalValue]
+    T3 --> U3[Betriebsstunden[I].Istwert := GetSignalValue]
+    U3 --> V3[Taktzeit[I].Istwert := GetSignalValue]
+    V3 --> W3[LaufzeitGes[I].Istwert := GetSignalValue]
+    W3 --> X3[LaufzeitSchicht[I].Istwert := GetSignalValue]
     
-    L3 --> Y3[Maschinen_Zustand[I].Istwert := ...]
-    Y3 --> Z3[Terminal_AuftragNr[I].Istwert := ...]
-    Z3 --> AA3[Terminal_Menge_Gebucht[I].Istwert := ...]
-    AA3 --> AB3[Terminal_Stillstand_Gebucht[I].Istwert := ...]
+    L3 --> Y3[Maschinen_Zustand[I].Istwert := GetSignalValue]
+    Y3 --> Z3[Terminal_AuftragNr[I].Istwert := GetSignalValue]
+    Z3 --> AA3[Terminal_Menge_Gebucht[I].Istwert := GetSignalValue]
+    AA3 --> AB3[Terminal_Stillstand_Gebucht[I].Istwert := GetSignalValue]
     
     L3 --> AC3[if SPC]
-    AC3 -->|Ja| AD3[SPC_Signal[I].Istwert := ...]
+    AC3 -->|Ja| AD3[SPC_Signal[I].Istwert := GetSignalValue]
     
     L3 --> AE3[if Metall]
     AE3 -->|Ja| AF3[Check_Auftrag_Start]
     AE3 -->|Ja| AG3[Check_Auftrag_Ende]
     
     L3 --> AH3[if Warmtrennen]
-    AH3 -->|Ja| AI3[MaschWarmtrennen[I].Istwert := ...]
+    AH3 -->|Ja| AI3[MaschWarmtrennen[I].Istwert := GetSignalValue]
     
     L3 --> AJ3[if SpannzeitUeberwachen]
-    AJ3 -->|Ja| AK3[SpannzeitSumme[I].Istwert := ...]
-    AK3 --> AL3[SpannzeitAktuell[I].Istwert := ...]
+    AJ3 -->|Ja| AK3[SpannzeitSumme[I].Istwert := GetSignalValue]
+    AK3 --> AL3[SpannzeitAktuell[I].Istwert := GetSignalValue]
     
     L3 --> AM3[if KavitaetFromSPS]
-    AM3 -->|Ja| AN3[SPSKavitaet[I].Istwert := ...]
+    AM3 -->|Ja| AN3[SPSKavitaet[I].Istwert := GetSignalValue]
 ```
 
 ---
@@ -286,6 +287,14 @@ graph TD
     C5 --> T5[if Taktzeit[I].Istwert <> Taktzeit[I].Altwert]
     T5 -->|Ja| U5[Schreibe_SPS_Wert I, CTAKTZEIT, Taktzeit[I].Istwert]
     T5 -->|Ja| V5[Taktzeit[I].Altwert := Taktzeit[I].Istwert]
+    
+    C5 --> W5[if LaufzeitGes[I].Istwert <> LaufzeitGes[I].Altwert]
+    W5 -->|Ja| X5[Schreibe_SPS_Wert I, CLAUFZEITGESAMT, LaufzeitGes[I].Istwert]
+    W5 -->|Ja| Y5[LaufzeitGes[I].Altwert := LaufzeitGes[I].Istwert]
+    
+    C5 --> Z5[if LaufzeitSchicht[I].Istwert <> LaufzeitSchicht[I].Altwert]
+    Z5 -->|Ja| A6[Schreibe_SPS_Wert I, CLAUFZEITSCHICHT, LaufzeitSchicht[I].Istwert]
+    Z5 -->|Ja| B6[LaufzeitSchicht[I].Altwert := LaufzeitSchicht[I].Istwert]
 ```
 
 ---
@@ -486,17 +495,18 @@ graph TD
     D12 -->|Ja| E12[S7Main2.Schreibe_SPS_Wert Maschnr, SignalNr, Wert]
     
     %% NeueSchicht
-    F12[NeueSchicht] --> G12[if GetShiftNo Shift_Model, Jetzt <> AlteSchicht]
-    G12 -->|Ja| H12[AlteSchicht := Schicht]
-    H12 --> I12[Result := True]
-    G12 -->|Nein| J12[Result := False]
+    F12[NeueSchicht] --> G12[Schicht := GetShiftNo Shift_Model, Jetzt]
+    G12 --> H12[if Schicht <> AlteSchicht]
+    H12 -->|Ja| I12[AlteSchicht := Schicht]
+    I12 --> J12[Result := True]
+    H12 -->|Nein| K12[Result := False]
     
     %% CheckRoteLampeAus
-    K12[CheckRoteLampeAus] --> L12[if MerkerRoteLampe <> '']
-    L12 -->|Ja| M12[Schreibe_SPS_Wert 0, TTT_GetSignalNr(CROTELAMPE_AUS), 1]
-    L12 -->|Ja| N12[Schreibe_SPS_Wert 0, TTT_GetSignalNr(CROTELAMPE_AUS), 0]
-    L12 -->|Ja| O12[Result := True]
-    L12 -->|Nein| P12[Result := False]
+    L12[CheckRoteLampeAus] --> M12[if MerkerRoteLampe <> '']
+    M12 -->|Ja| N12[Schreibe_SPS_Wert 0, TTT_GetSignalNr(CROTELAMPE_AUS), 1]
+    N12 --> O12[Schreibe_SPS_Wert 0, TTT_GetSignalNr(CROTELAMPE_AUS), 0]
+    O12 --> P12[Result := True]
+    M12 -->|Nein| Q12[Result := False]
 ```
 
 ---
@@ -606,8 +616,9 @@ Timer1Timer
 
 ```
 NeueSchicht
-├── GetShiftNo Shift_Model, Jetzt
+├── Schicht := GetShiftNo Shift_Model, Jetzt
 ├── if Schicht <> AlteSchicht
+│   ├── AlteSchicht := Schicht
 │   ├── SchreibeMeldung
 │   ├── StartSchichtWechsel
 │   │   ├── for I := 1 to Anzahl_Masch
