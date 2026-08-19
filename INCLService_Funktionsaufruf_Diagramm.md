@@ -64,7 +64,7 @@ graph TD
 graph TD
     %% TS7Main.Create
     A1[TS7Main.Create] --> B1[ErrorCount := 0]
-    B1 --> C1[INCLUDIS_HOME := Ini.ReadString('Main', 'Home')]
+    B1 --> C1[INCLUDIS_HOME := aus Ini Main-Home]
     C1 --> D1[Hochlauf := True]
     D1 --> E1[First_Lauf := True]
     E1 --> F1[Daten_Enabled := True]
