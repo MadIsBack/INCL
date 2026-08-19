@@ -48,7 +48,7 @@ graph TD
     
     %% Service-Events
     O[ServiceBeforeInstall] --> P[SetDBUser]
-    O --> Q[DisplayName := SERVICE_DISPLAY_NAME + UpperCase(DBUser)]
+    O --> Q[DisplayName := SERVICE_DISPLAY_NAME + DBUser]
     R[ServiceCreate] --> P
     S[ServiceDestroy] --> T[SchreibeMeldung 'Service Stop']
     U[ServiceShutdown] --> V[SchreibeMeldung 'Service Shutdown']
