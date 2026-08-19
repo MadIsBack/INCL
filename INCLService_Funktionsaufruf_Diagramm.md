@@ -77,7 +77,7 @@ graph TD
     L1 --> M1[S7_Auftrag := TCO_Auftrag.Create]
     M1 --> N1[INC_Meldung := TCO_INCMeldung.Create]
     N1 --> O1[INC_Meldung.Anmelden]
-    O1 --> P1[SetLength(Includis, Anzahl_Masch + 1)]
+    O1 --> P1[SetLength Includis, Anzahl_Masch + 1]
     P1 --> Q1[InitAddr]
     Q1 --> R1[K_Init]
     R1 --> S1[CCC_SetSchichtKonstante]
