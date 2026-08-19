@@ -159,7 +159,7 @@ graph TD
     E3 -->|Ja| H3[HochlaufTPM := True]
     
     D3 --> I3[for I := 1 to Anzahl_Masch]
-    I3 --> J3[{Includis(I)_IstArchiviert}]
+    I3 --> J3[{Includis[I].IstArchiviert}]
     J3 -->|Ja| K3[Continue]
     J3 -->|Nein| L3[Masch := TTT_GetMaschine(I)]
     
