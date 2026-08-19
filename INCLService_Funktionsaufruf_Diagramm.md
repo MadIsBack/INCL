@@ -159,15 +159,15 @@ graph TD
     E3 -->|Ja| H3[HochlaufTPM := True]
     
     D3 --> I3[for I := 1 to Anzahl_Masch]
-    I3 --> J3[if Includis[I].IstArchiviert]
+    I3 --> J3[if Includis(I).IstArchiviert]
     J3 -->|Ja| K3[Continue]
     J3 -->|Nein| L3[Masch := TTT_GetMaschine(I)]
     
     L3 --> M3[if BCD_Schalter]
-    M3 -->|Ja| N3[BCD_Read[I].Istwert := ...]
+    M3 -->|Ja| N3[BCD_Read(I).Istwert := ...]
     
-    L3 --> O3[if HandAuto[I].Istwert]
-    O3 -->|Ja| P3[MaschProgrammbetrieb[I].Istwert := ...]
+    L3 --> O3[if HandAuto(I).Istwert]
+    O3 -->|Ja| P3[MaschProgrammbetrieb(I).Istwert := ...]
     
     L3 --> Q3[StueckGesamt[I].Istwert := ...]
     Q3 --> R3[StueckAuftragGesamt[I].Istwert := ...]
