@@ -31,28 +31,28 @@
 graph TD
     %% Service-Lifecycle
     A[ServiceExecute] --> B[CoInitialize]
-    B --> C[CSLog := TCriticalSection.Create]
+    B --> C[CSLog=TCriticalSection_Create]
     C --> D[CheckDBVerbindung]
-    D -->|Erfolg| E[Daten.Database.Connected := True]
+    D -->|Erfolg| E[Daten_Database_Connected=True]
     D -->|Fehler| F[Sleep 30s]
     F --> D
-    E --> G[S7Main := TS7Main.Create]
-    G --> H[S7MainOK := True]
+    E --> G[S7Main=TS7Main_Create]
+    G --> H[S7MainOK=True]
     H --> I[while not Terminated]
-    I --> J[ServiceThread.ProcessRequests]
+    I --> J[ServiceThread_ProcessRequests]
     I --> K{S7MainOK?}
-    K -->|Nein| L[S7Main.Free]
-    L --> M[S7Main := TS7Main.Create]
+    K -->|Nein| L[S7Main_Free]
+    L --> M[S7Main=TS7Main_Create]
     M --> H
     K -->|Ja| I
     I --> N[CoUninitialize]
     
     %% Service-Events
     O[ServiceBeforeInstall] --> P[SetDBUser]
-    O --> Q[DisplayName := SERVICE_DISPLAY_NAME + UpperCase(DBUser)]
+    O --> Q[DisplayName=SERVICE_DISPLAY_NAME+UpperCase{DBUser}]
     R[ServiceCreate] --> P
-    S[ServiceDestroy] --> T[SchreibeMeldung 'Service Stop']
-    U[ServiceShutdown] --> V[SchreibeMeldung 'Service Shutdown']
+    S[ServiceDestroy] --> T[SchreibeMeldung {Service Stop}]
+    U[ServiceShutdown] --> V[SchreibeMeldung {Service Shutdown}]
 ```
 
 ---
@@ -64,26 +64,26 @@ graph TD
 ```mermaid
 graph TD
     %% TS7Main.Create
-    A1[TS7Main.Create] --> B1[ErrorCount := 0]
-    B1 --> C1[INCLUDIS_HOME := Ini.ReadString('Main', 'Home')]
-    C1 --> D1[Hochlauf := True]
-    D1 --> E1[First_Lauf := True]
-    E1 --> F1[Daten_Enabled := True]
-    F1 --> G1[Timer1 := TTimer.Create]
-    G1 --> H1[Timer1.Interval := A * 1000]
-    H1 --> I1[MainServiceAliveTimer := TCO_AliveClient.Create]
-    I1 --> J1[Timer1.OnTimer := Timer1Timer]
-    J1 --> K1[TPM := TCO_TPM.Create]
-    K1 --> L1[cSPC := TCO_SPC.Create]
-    L1 --> M1[S7_Auftrag := TCO_Auftrag.Create]
-    M1 --> N1[INC_Meldung := TCO_INCMeldung.Create]
-    N1 --> O1[INC_Meldung.Anmelden]
-    O1 --> P1[SetLength(Includis, Anzahl_Masch + 1)]
+    A1[TS7Main_Create] --> B1[ErrorCount=0]
+    B1 --> C1[INCLUDIS_HOME=Ini_ReadString Main Home]
+    C1 --> D1[Hochlauf=True]
+    D1 --> E1[First_Lauf=True]
+    E1 --> F1[Daten_Enabled=True]
+    F1 --> G1[Timer1=TTimer_Create]
+    G1 --> H1[Timer1_Interval=A * 1000]
+    H1 --> I1[MainServiceAliveTimer=TCO_AliveClient_Create]
+    I1 --> J1[Timer1_OnTimer=Timer1Timer]
+    J1 --> K1[TPM=TCO_TPM_Create]
+    K1 --> L1[cSPC=TCO_SPC_Create]
+    L1 --> M1[S7_Auftrag=TCO_Auftrag_Create]
+    M1 --> N1[INC_Meldung=TCO_INCMeldung_Create]
+    N1 --> O1[INC_Meldung_Anmelden]
+    O1 --> P1[SetLengthIncludis_ Anzahl_Masch+1]
     P1 --> Q1[InitAddr]
     Q1 --> R1[K_Init]
     R1 --> S1[CCC_SetSchichtKonstante]
     S1 --> T1[LoadSignals]
-    T1 --> U1[for I := 1 to Anzahl_Masch]
+    T1 --> U1[for I=1 to Anzahl_Masch]
     U1 --> V1[Initialisierung aller Signal-Arrays]
 ```
 
@@ -94,51 +94,51 @@ graph TD
 ```mermaid
 graph TD
     %% Timer1Timer - Hauptzyklus
-    A2[Timer1Timer] --> B2[MainServiceAliveTimer.Alive]
-    B2 --> C2[Jetzt := Now]
+    A2[Timer1Timer] --> B2[MainServiceAliveTimer_Alive]
+    B2 --> C2[Jetzt=Now]
     C2 --> D2[if Hochlauf]
-    D2 -->|Ja| E2[Hochlauf := False]
-    D2 -->|Ja| F2[First_Lauf := False]
+    D2 -->|Ja| E2[Hochlauf=False]
+    D2 -->|Ja| F2[First_Lauf=False]
     D2 -->|Ja| G2[DatenLesen]
     G2 --> H2[DatenLesen2]
     H2 --> I2[DatenLesen_Metall]
     I2 --> J2[In_SPSWerteDB]
-    J2 --> K2[First := False]
-    K2 --> L2[HochlaufTPM := False]
+    J2 --> K2[First=False]
+    K2 --> L2[HochlaufTPM=False]
     
     C2 --> M2[if not Daten_Enabled]
     M2 -->|Ja| N2[Exit]
     
-    C2 --> O2[TimerBegin := Now]
+    C2 --> O2[TimerBegin=Now]
     O2 --> P2[try]
-    P2 --> Q2[if S7_Auftrag <> nil]
-    Q2 -->|Ja| R2[S7_Auftrag.DatenLesen]
-    Q2 -->|Ja| S2[S7_Auftrag.DatenLesen2]
+    P2 --> Q2[if S7_Auftrag!=nil]
+    Q2 -->|Ja| R2[S7_Auftrag_DatenLesen]
+    Q2 -->|Ja| S2[S7_Auftrag_DatenLesen2]
     
     P2 --> T2[DatenLesen]
     T2 --> U2[DatenLesen2]
     U2 --> V2[DatenLesen_Metall]
     V2 --> W2[In_SPSWerteDB]
     
-    P2 --> X2[if TPM <> nil]
-    X2 -->|Ja| Y2[TPM.DatenLesen]
+    P2 --> X2[if TPM!=nil]
+    X2 -->|Ja| Y2[TPM_DatenLesen]
     
-    P2 --> Z2[if cSPC <> nil]
+    P2 --> Z2[if cSPC!=nil]
     Z2 -->|Ja| AA2[SPC_Aktuelle_Werte_Schreiben]
     
     P2 --> AB2[if Metall]
     AB2 -->|Ja| AC2[Check_Auftrag_Start]
     AB2 -->|Ja| AD2[Check_Auftrag_Ende]
     
-    P2 --> AE2[TimerEnd := Now]
-    AE2 --> AF2[if TimerEnd - TimerBegin > 0.1]
-    AF2 -->|Ja| AG2[SchreibeMeldung 'Timer1Timer took too long']
+    P2 --> AE2[TimerEnd=Now]
+    AE2 --> AF2[if TimerEnd - TimerBegin > 0_1]
+    AF2 -->|Ja| AG2[SchreibeMeldung {Timer1Timer took too long}]
     
     P2 -->|Exception| AH2[HandleSystemError]
-    AH2 --> AI2[ErrorCount += 1]
+    AH2 --> AI2[ErrorCount+=1]
     AI2 --> AJ2{ErrorCount > 5?}
-    AJ2 -->|Ja| AK2[Daten_Enabled := False]
-    AJ2 -->|Ja| AL2[SchreibeMeldung 'Error in Timer1Timer']
+    AJ2 -->|Ja| AK2[Daten_Enabled=False]
+    AJ2 -->|Ja| AL2[SchreibeMeldung {Error in Timer1Timer}]
     AJ2 -->|Nein| AM2[Exit]
 ```
 
@@ -153,53 +153,53 @@ graph TD
     %% DatenLesen
     A3[DatenLesen] --> B3[if not Daten_Enabled]
     B3 -->|Ja| C3[Exit]
-    B3 -->|Nein| D3[Jetzt := Now]
+    B3 -->|Nein| D3[Jetzt=Now]
     D3 --> E3[if First]
-    E3 -->|Ja| F3[First := False]
-    E3 -->|Ja| G3[Hochlauf := True]
-    E3 -->|Ja| H3[HochlaufTPM := True]
+    E3 -->|Ja| F3[First=False]
+    E3 -->|Ja| G3[Hochlauf=True]
+    E3 -->|Ja| H3[HochlaufTPM=True]
     
-    D3 --> I3[for I := 1 to Anzahl_Masch]
-    I3 --> J3[if Includis[I].IstArchiviert]
+    D3 --> I3[for I=1 to Anzahl_Masch]
+    I3 --> J3[if Includis_I_IstArchiviert]
     J3 -->|Ja| K3[Continue]
-    J3 -->|Nein| L3[Masch := TTT_GetMaschine(I)]
+    J3 -->|Nein| L3[Masch=TTT_GetMaschineI]
     
     L3 --> M3[if BCD_Schalter]
-    M3 -->|Ja| N3[BCD_Read[I].Istwert := GetSignalValue]
+    M3 -->|Ja| N3[BCD_Read_I_.Istwert := GetSignalValue]
     
-    L3 --> O3[if HandAuto[I].Istwert]
-    O3 -->|Ja| P3[MaschProgrammbetrieb[I].Istwert := GetSignalValue]
+    L3 --> O3[if HandAuto_I_.Istwert]
+    O3 -->|Ja| P3[MaschProgrammbetrieb_I_.Istwert := GetSignalValue]
     
-    L3 --> Q3[StueckGesamt[I].Istwert := GetSignalValue]
-    Q3 --> R3[StueckAuftragGesamt[I].Istwert := GetSignalValue]
-    R3 --> S3[StueckAuftragSchicht[I].Istwert := GetSignalValue]
-    S3 --> T3[StueckSchicht[I].Istwert := GetSignalValue]
-    T3 --> U3[Betriebsstunden[I].Istwert := GetSignalValue]
-    U3 --> V3[Taktzeit[I].Istwert := GetSignalValue]
-    V3 --> W3[LaufzeitGes[I].Istwert := GetSignalValue]
-    W3 --> X3[LaufzeitSchicht[I].Istwert := GetSignalValue]
+    L3 --> Q3[StueckGesamt_I_.Istwert := GetSignalValue]
+    Q3 --> R3[StueckAuftragGesamt_I_.Istwert := GetSignalValue]
+    R3 --> S3[StueckAuftragSchicht_I_.Istwert := GetSignalValue]
+    S3 --> T3[StueckSchicht_I_.Istwert := GetSignalValue]
+    T3 --> U3[Betriebsstunden_I_.Istwert := GetSignalValue]
+    U3 --> V3[Taktzeit_I_.Istwert := GetSignalValue]
+    V3 --> W3[LaufzeitGes_I_.Istwert := GetSignalValue]
+    W3 --> X3[LaufzeitSchicht_I_.Istwert := GetSignalValue]
     
-    L3 --> Y3[Maschinen_Zustand[I].Istwert := GetSignalValue]
-    Y3 --> Z3[Terminal_AuftragNr[I].Istwert := GetSignalValue]
-    Z3 --> AA3[Terminal_Menge_Gebucht[I].Istwert := GetSignalValue]
-    AA3 --> AB3[Terminal_Stillstand_Gebucht[I].Istwert := GetSignalValue]
+    L3 --> Y3[Maschinen_Zustand_I_.Istwert := GetSignalValue]
+    Y3 --> Z3[Terminal_AuftragNr_I_.Istwert := GetSignalValue]
+    Z3 --> AA3[Terminal_Menge_Gebucht_I_.Istwert := GetSignalValue]
+    AA3 --> AB3[Terminal_Stillstand_Gebucht_I_.Istwert := GetSignalValue]
     
     L3 --> AC3[if SPC]
-    AC3 -->|Ja| AD3[SPC_Signal[I].Istwert := GetSignalValue]
+    AC3 -->|Ja| AD3[SPC_Signal_I_.Istwert := GetSignalValue]
     
     L3 --> AE3[if Metall]
     AE3 -->|Ja| AF3[Check_Auftrag_Start]
     AE3 -->|Ja| AG3[Check_Auftrag_Ende]
     
     L3 --> AH3[if Warmtrennen]
-    AH3 -->|Ja| AI3[MaschWarmtrennen[I].Istwert := GetSignalValue]
+    AH3 -->|Ja| AI3[MaschWarmtrennen_I_.Istwert := GetSignalValue]
     
     L3 --> AJ3[if SpannzeitUeberwachen]
-    AJ3 -->|Ja| AK3[SpannzeitSumme[I].Istwert := GetSignalValue]
-    AK3 --> AL3[SpannzeitAktuell[I].Istwert := GetSignalValue]
+    AJ3 -->|Ja| AK3[SpannzeitSumme_I_.Istwert := GetSignalValue]
+    AK3 --> AL3[SpannzeitAktuell_I_.Istwert := GetSignalValue]
     
     L3 --> AM3[if KavitaetFromSPS]
-    AM3 -->|Ja| AN3[SPSKavitaet[I].Istwert := GetSignalValue]
+    AM3 -->|Ja| AN3[SPSKavitaet_I_.Istwert := GetSignalValue]
 ```
 
 ---
@@ -212,44 +212,44 @@ graph TD
     A4[DatenLesen2] --> B4[if not Daten_Enabled]
     B4 -->|Ja| C4[Exit]
     
-    B4 -->|Nein| D4[for I := 1 to Anzahl_Masch]
-    D4 --> E4[if Includis[I].IstArchiviert]
+    B4 -->|Nein| D4[for I=1 to Anzahl_Masch]
+    D4 --> E4[if Includis_I_IstArchiviert]
     E4 -->|Ja| F4[Continue]
     
-    E4 -->|Nein| G4[if BCD[I].Istwert <> BCD[I].Altwert]
-    G4 -->|Ja| H4[BCD_Read[I].Istwert := True]
-    G4 -->|Ja| I4[BCD[I].Altwert := BCD[I].Istwert]
+    E4 -->|Nein| G4[if BCD_I_.Istwert <> BCD_I_.Altwert]
+    G4 -->|Ja| H4[BCD_Read_I_.Istwert := True]
+    G4 -->|Ja| I4[BCD_I_.Altwert := BCD_I_.Istwert]
     
-    E4 --> J4[if BCD_Read[I].Istwert]
-    J4 -->|Ja| K4[BCD_Read[I].Istwert := False]
+    E4 --> J4[if BCD_Read_I_.Istwert]
+    J4 -->|Ja| K4[BCD_Read_I_.Istwert := False]
     J4 -->|Ja| L4[if BCD_Schalter]
     L4 -->|Ja| M4[Auftrag_Starten_BCDCode I]
     
-    E4 --> N4[if HandAuto[I].Istwert <> HandAuto[I].Altwert]
-    N4 -->|Ja| O4[HandAuto[I].Altwert := HandAuto[I].Istwert]
+    E4 --> N4[if HandAuto_I_.Istwert <> HandAuto_I_.Altwert]
+    N4 -->|Ja| O4[HandAuto_I_.Altwert := HandAuto_I_.Istwert]
     
-    E4 --> P4[if Maschinen_Zustand[I].Istwert <> Maschinen_Zustand[I].Altwert]
-    P4 -->|Ja| Q4[Maschinen_Zustand[I].Altwert := Maschinen_Zustand[I].Istwert]
+    E4 --> P4[if Maschinen_Zustand_I_.Istwert <> Maschinen_Zustand_I_.Altwert]
+    P4 -->|Ja| Q4[Maschinen_Zustand_I_.Altwert := Maschinen_Zustand_I_.Istwert]
     P4 -->|Ja| R4[if Maschinen_Status_Schreiben]
-    R4 -->|Ja| S4[Schreibe_SPS_Wert I, CMASCHINEN_STATUS, Maschinen_Zustand[I].Istwert]
+    R4 -->|Ja| S4[Schreibe_SPS_Wert I_ CMASCHINEN_STATUS_ Maschinen_Zustand_I_.Istwert]
     
-    E4 --> T4[if Terminal_AuftragNr[I].Istwert <> Terminal_AuftragNr[I].Altwert]
-    T4 -->|Ja| U4[Terminal_AuftragNr[I].Altwert := Terminal_AuftragNr[I].Istwert]
+    E4 --> T4[if Terminal_AuftragNr_I_.Istwert <> Terminal_AuftragNr_I_.Altwert]
+    T4 -->|Ja| U4[Terminal_AuftragNr_I_.Altwert := Terminal_AuftragNr_I_.Istwert]
     
-    E4 --> V4[if Terminal_Menge_Gebucht[I].Istwert]
-    V4 -->|Ja| W4[Terminal_Menge_Gebucht[I].Istwert := False]
+    E4 --> V4[if Terminal_Menge_Gebucht_I_.Istwert]
+    V4 -->|Ja| W4[Terminal_Menge_Gebucht_I_.Istwert := False]
     V4 -->|Ja| X4[Menge_Gebucht I]
     
-    E4 --> Y4[if Terminal_Stillstand_Gebucht[I].Istwert]
-    Y4 -->|Ja| Z4[Terminal_Stillstand_Gebucht[I].Istwert := False]
+    E4 --> Y4[if Terminal_Stillstand_Gebucht_I_.Istwert]
+    Y4 -->|Ja| Z4[Terminal_Stillstand_Gebucht_I_.Istwert := False]
     Y4 -->|Ja| AA4[Stillstand_Gebucht I]
     
-    E4 --> AB4[if Terminal_Auftrag_Beendet[I].Istwert]
-    AB4 -->|Ja| AC4[Terminal_Auftrag_Beendet[I].Istwert := False]
+    E4 --> AB4[if Terminal_Auftrag_Beendet_I_.Istwert]
+    AB4 -->|Ja| AC4[Terminal_Auftrag_Beendet_I_.Istwert := False]
     AB4 -->|Ja| AD4[Auftrag_Ende I]
     
-    E4 --> AE4[if Terminal_Auftrag_Unterbrochen[I].Istwert]
-    AE4 -->|Ja| AF4[Terminal_Auftrag_Unterbrochen[I].Istwert := False]
+    E4 --> AE4[if Terminal_Auftrag_Unterbrochen_I_.Istwert]
+    AE4 -->|Ja| AF4[Terminal_Auftrag_Unterbrochen_I_.Istwert := False]
     AE4 -->|Ja| AG4[Auftrag_Unterbrechen I]
 ```
 
@@ -260,41 +260,41 @@ graph TD
 ```mermaid
 graph TD
     %% In_SPSWerteDB
-    A5[In_SPSWerteDB] --> B5[for I := 1 to Anzahl_Masch]
-    B5 --> C5[if Includis[I].IstArchiviert]
+    A5[In_SPSWerteDB] --> B5[for I=1 to Anzahl_Masch]
+    B5 --> C5[if Includis_I_IstArchiviert]
     C5 -->|Ja| D5[Continue]
     
-    C5 -->|Nein| E5[if StueckGesamt[I].Istwert <> StueckGesamt[I].Altwert]
-    E5 -->|Ja| F5[Schreibe_SPS_Wert I, CSTUECKGESAMT, StueckGesamt[I].Istwert]
-    E5 -->|Ja| G5[StueckGesamt[I].Altwert := StueckGesamt[I].Istwert]
+    C5 -->|Nein| E5[if StueckGesamt_I_.Istwert <> StueckGesamt_I_.Altwert]
+    E5 -->|Ja| F5[Schreibe_SPS_Wert I_ CSTUECKGESAMT_ StueckGesamt_I_.Istwert]
+    E5 -->|Ja| G5[StueckGesamt_I_.Altwert := StueckGesamt_I_.Istwert]
     
-    C5 --> H5[if StueckAuftragGesamt[I].Istwert <> StueckAuftragGesamt[I].Altwert]
-    H5 -->|Ja| I5[Schreibe_SPS_Wert I, CSTUECKAUFTRAGGESAMT, StueckAuftragGesamt[I].Istwert]
-    H5 -->|Ja| J5[StueckAuftragGesamt[I].Altwert := StueckAuftragGesamt[I].Istwert]
+    C5 --> H5[if StueckAuftragGesamt_I_.Istwert <> StueckAuftragGesamt_I_.Altwert]
+    H5 -->|Ja| I5[Schreibe_SPS_Wert I_ CSTUECKAUFTRAGGESAMT_ StueckAuftragGesamt_I_.Istwert]
+    H5 -->|Ja| J5[StueckAuftragGesamt_I_.Altwert := StueckAuftragGesamt_I_.Istwert]
     
-    C5 --> K5[if StueckAuftragSchicht[I].Istwert <> StueckAuftragSchicht[I].Altwert]
-    K5 -->|Ja| L5[Schreibe_SPS_Wert I, CSTUECKAUFTRAGSCHICHT, StueckAuftragSchicht[I].Istwert]
-    K5 -->|Ja| M5[StueckAuftragSchicht[I].Altwert := StueckAuftragSchicht[I].Istwert]
+    C5 --> K5[if StueckAuftragSchicht_I_.Istwert <> StueckAuftragSchicht_I_.Altwert]
+    K5 -->|Ja| L5[Schreibe_SPS_Wert I_ CSTUECKAUFTRAGSCHICHT_ StueckAuftragSchicht_I_.Istwert]
+    K5 -->|Ja| M5[StueckAuftragSchicht_I_.Altwert := StueckAuftragSchicht_I_.Istwert]
     
-    C5 --> N5[if StueckSchicht[I].Istwert <> StueckSchicht[I].Altwert]
-    N5 -->|Ja| O5[Schreibe_SPS_Wert I, CSTUECKSCHICHT, StueckSchicht[I].Istwert]
-    N5 -->|Ja| P5[StueckSchicht[I].Altwert := StueckSchicht[I].Istwert]
+    C5 --> N5[if StueckSchicht_I_.Istwert <> StueckSchicht_I_.Altwert]
+    N5 -->|Ja| O5[Schreibe_SPS_Wert I_ CSTUECKSCHICHT_ StueckSchicht_I_.Istwert]
+    N5 -->|Ja| P5[StueckSchicht_I_.Altwert := StueckSchicht_I_.Istwert]
     
-    C5 --> Q5[if Betriebsstunden[I].Istwert <> Betriebsstunden[I].Altwert]
-    Q5 -->|Ja| R5[Schreibe_SPS_Wert I, CBETRIEBSSTUNDEN, Betriebsstunden[I].Istwert]
-    Q5 -->|Ja| S5[Betriebsstunden[I].Altwert := Betriebsstunden[I].Istwert]
+    C5 --> Q5[if Betriebsstunden_I_.Istwert <> Betriebsstunden_I_.Altwert]
+    Q5 -->|Ja| R5[Schreibe_SPS_Wert I_ CBETRIEBSSTUNDEN_ Betriebsstunden_I_.Istwert]
+    Q5 -->|Ja| S5[Betriebsstunden_I_.Altwert := Betriebsstunden_I_.Istwert]
     
-    C5 --> T5[if Taktzeit[I].Istwert <> Taktzeit[I].Altwert]
-    T5 -->|Ja| U5[Schreibe_SPS_Wert I, CTAKTZEIT, Taktzeit[I].Istwert]
-    T5 -->|Ja| V5[Taktzeit[I].Altwert := Taktzeit[I].Istwert]
+    C5 --> T5[if Taktzeit_I_.Istwert <> Taktzeit_I_.Altwert]
+    T5 -->|Ja| U5[Schreibe_SPS_Wert I_ CTAKTZEIT_ Taktzeit_I_.Istwert]
+    T5 -->|Ja| V5[Taktzeit_I_.Altwert := Taktzeit_I_.Istwert]
     
-    C5 --> W5[if LaufzeitGes[I].Istwert <> LaufzeitGes[I].Altwert]
-    W5 -->|Ja| X5[Schreibe_SPS_Wert I, CLAUFZEITGESAMT, LaufzeitGes[I].Istwert]
-    W5 -->|Ja| Y5[LaufzeitGes[I].Altwert := LaufzeitGes[I].Istwert]
+    C5 --> W5[if LaufzeitGes_I_.Istwert <> LaufzeitGes_I_.Altwert]
+    W5 -->|Ja| X5[Schreibe_SPS_Wert I_ CLAUFZEITGESAMT_ LaufzeitGes_I_.Istwert]
+    W5 -->|Ja| Y5[LaufzeitGes_I_.Altwert := LaufzeitGes_I_.Istwert]
     
-    C5 --> Z5[if LaufzeitSchicht[I].Istwert <> LaufzeitSchicht[I].Altwert]
-    Z5 -->|Ja| A6[Schreibe_SPS_Wert I, CLAUFZEITSCHICHT, LaufzeitSchicht[I].Istwert]
-    Z5 -->|Ja| B6[LaufzeitSchicht[I].Altwert := LaufzeitSchicht[I].Istwert]
+    C5 --> Z5[if LaufzeitSchicht_I_.Istwert <> LaufzeitSchicht_I_.Altwert]
+    Z5 -->|Ja| A6[Schreibe_SPS_Wert I_ CLAUFZEITSCHICHT_ LaufzeitSchicht_I_.Istwert]
+    Z5 -->|Ja| B6[LaufzeitSchicht_I_.Altwert := LaufzeitSchicht_I_.Istwert]
 ```
 
 ---
@@ -306,22 +306,22 @@ graph TD
 ```mermaid
 graph TD
     %% StartSchichtWechsel
-    A7[StartSchichtWechsel] --> B7[SchreibeMeldung 'Schichtwechsel gestartet']
-    B7 --> C7[AlteSchicht := Schicht]
-    C7 --> D7[Schicht := GetShiftNo Shift_Model, Jetzt]
-    D7 --> E7[if Schicht <> AlteSchicht]
-    E7 -->|Ja| F7[SchreibeMeldung 'Schichtwechsel von ' + IntToStr(AlteSchicht) + ' nach ' + IntToStr(Schicht)]
+    A7[StartSchichtWechsel] --> B7[SchreibeMeldung {Schichtwechsel gestartet}]
+    B7 --> C7[AlteSchicht=Schicht]
+    C7 --> D7[Schicht=GetShiftNo Shift_Model_ Jetzt]
+    D7 --> E7[if Schicht!=AlteSchicht]
+    E7 -->|Ja| F7[SchreibeMeldung {Schichtwechsel von }+IntToStrAlteSchicht+{ nach }+IntToStrSchicht]
     E7 -->|Ja| G7[NeueSchicht AlteSchicht]
-    G7 -->|True| H7[SchichtSpeicher := Schicht]
-    H7 --> I7[for I := 1 to Anzahl_Masch]
-    I7 --> J7[if Includis[I].IstArchiviert]
+    G7 -->|True| H7[SchichtSpeicher=Schicht]
+    H7 --> I7[for I=1 to Anzahl_Masch]
+    I7 --> J7[if Includis_I_IstArchiviert]
     J7 -->|Ja| K7[Continue]
-    J7 -->|Nein| L7[StueckSchicht[I].Altwert := StueckSchicht[I].Istwert]
-    L7 --> M7[StueckSchicht[I].Istwert := 0]
-    L7 --> N7[StueckAuftragSchicht[I].Altwert := StueckAuftragSchicht[I].Istwert]
-    N7 --> O7[StueckAuftragSchicht[I].Istwert := 0]
-    L7 --> P7[LaufzeitSchicht[I].Altwert := LaufzeitSchicht[I].Istwert]
-    P7 --> Q7[LaufzeitSchicht[I].Istwert := 0]
+    J7 -->|Nein| L7[StueckSchicht_I_.Altwert := StueckSchicht_I_.Istwert]
+    L7 --> M7[StueckSchicht_I_.Istwert := 0]
+    L7 --> N7[StueckAuftragSchicht_I_.Altwert := StueckAuftragSchicht_I_.Istwert]
+    N7 --> O7[StueckAuftragSchicht_I_.Istwert := 0]
+    L7 --> P7[LaufzeitSchicht_I_.Altwert := LaufzeitSchicht_I_.Istwert]
+    P7 --> Q7[LaufzeitSchicht_I_.Istwert := 0]
     
     E7 -->|Ja| R7[if SPC]
     R7 -->|Ja| S7[SPC_Init]
@@ -340,7 +340,7 @@ graph TD
 graph TD
     %% Thread_Schicht.Execute
     A6[Execute] --> B6[while not Terminated]
-    B6 --> C6[WaitForSingleObject(Event_Schicht, INFINITE)]
+    B6 --> C6[WaitForSingleObjectEvent_Schicht_ INFINITE]
     C6 --> D6[if Schicht_Berechnung]
     D6 -->|Ja| E6[Berechne_Stillstaende_Schicht Stillstaende_Schicht]
     D6 -->|Ja| F6[TPM_Schicht_Pruefen Stillstaende_Schicht]
@@ -372,11 +372,11 @@ graph TD
 graph TD
     %% Thread_Zusatz.Execute
     A8[Execute] --> B8[while not Terminated]
-    B8 --> C8[WaitForSingleObject(Event_Zusatz, INFINITE)]
+    B8 --> C8[WaitForSingleObjectEvent_Zusatz_ INFINITE]
     C8 --> D8[StartProgramme]
     D8 --> E8[if ThreadZusatzTimer > 0]
     E8 -->|Ja| F8[if Now - ThreadZusatzLast > ThreadZusatzTimer / 86400]
-    F8 -->|Ja| G8[ThreadZusatzLast := Now]
+    F8 -->|Ja| G8[ThreadZusatzLast=Now]
     F8 -->|Ja| H8[Palette_Rest_Berechnen]
     H8 --> I8[TPM_Korrektur_Doppelte_Daten]
     I8 --> J8[WZReparatur]
@@ -420,7 +420,7 @@ graph TD
     A9 --> K9[if Option_Werkzeug]
     K9 -->|Ja| L9[Werkzeug_Ruesten]
     
-    A9 --> M9[Result := 1]
+    A9 --> M9[Result=1]
     
     %% Beenden
     N9[Beenden] --> O9[SQL_Get]
@@ -452,8 +452,8 @@ graph TD
 ```mermaid
 graph TD
     %% CO_TPM Hauptfunktionen
-    A10[TCO_TPM.Create] --> B10[Database := nil]
-    B10 --> C10[FApplicationID := 0]
+    A10[TCO_TPM_Create] --> B10[Database=nil]
+    B10 --> C10[FApplicationID=0]
     
     %% Berechnungsfunktionen
     D10[TPM_Berechnung_Schicht] --> E10[SQL_Get]
@@ -488,25 +488,25 @@ graph TD
 ```mermaid
 graph TD
     %% Hilfsfunktionen
-    A12[Schreibe_SPS_Wert] --> B12[if S7Typ = 1]
-    B12 -->|Ja| C12[S7Main.Schreibe_SPS_Wert Maschnr, SignalNr, Wert]
+    A12[Schreibe_SPS_Wert] --> B12[if S7Typ=1]
+    B12 -->|Ja| C12[S7Main_Schreibe_SPS_Wert Maschnr_ SignalNr_ Wert]
     
-    A12 --> D12[if S7Typ = 2]
-    D12 -->|Ja| E12[S7Main2.Schreibe_SPS_Wert Maschnr, SignalNr, Wert]
+    A12 --> D12[if S7Typ=2]
+    D12 -->|Ja| E12[S7Main2_Schreibe_SPS_Wert Maschnr_ SignalNr_ Wert]
     
     %% NeueSchicht
-    F12[NeueSchicht] --> G12[Schicht := GetShiftNo Shift_Model, Jetzt]
-    G12 --> H12[if Schicht <> AlteSchicht]
-    H12 -->|Ja| I12[AlteSchicht := Schicht]
-    I12 --> J12[Result := True]
-    H12 -->|Nein| K12[Result := False]
+    F12[NeueSchicht] --> G12[Schicht=GetShiftNo Shift_Model_ Jetzt]
+    G12 --> H12[if Schicht!=AlteSchicht]
+    H12 -->|Ja| I12[AlteSchicht=Schicht]
+    I12 --> J12[Result=True]
+    H12 -->|Nein| K12[Result=False]
     
     %% CheckRoteLampeAus
-    L12[CheckRoteLampeAus] --> M12[if MerkerRoteLampe <> '']
-    M12 -->|Ja| N12[Schreibe_SPS_Wert 0, TTT_GetSignalNr(CROTELAMPE_AUS), 1]
-    N12 --> O12[Schreibe_SPS_Wert 0, TTT_GetSignalNr(CROTELAMPE_AUS), 0]
-    O12 --> P12[Result := True]
-    M12 -->|Nein| Q12[Result := False]
+    L12[CheckRoteLampeAus] --> M12[if MerkerRoteLampe!='']
+    M12 -->|Ja| N12[Schreibe_SPS_Wert 0_ TTT_GetSignalNrCROTELAMPE_AUS_ 1]
+    N12 --> O12[Schreibe_SPS_Wert 0_ TTT_GetSignalNrCROTELAMPE_AUS_ 0]
+    O12 --> P12[Result=True]
+    M12 -->|Nein| Q12[Result=False]
 ```
 
 ---
@@ -622,12 +622,12 @@ NeueSchicht
 │   ├── SchreibeMeldung
 │   ├── StartSchichtWechsel
 │   │   ├── for I := 1 to Anzahl_Masch
-│   │   │   ├── StueckSchicht[I].Altwert := StueckSchicht[I].Istwert
-│   │   │   ├── StueckSchicht[I].Istwert := 0
-│   │   │   ├── StueckAuftragSchicht[I].Altwert := StueckAuftragSchicht[I].Istwert
-│   │   │   ├── StueckAuftragSchicht[I].Istwert := 0
-│   │   │   └── LaufzeitSchicht[I].Altwert := LaufzeitSchicht[I].Istwert
-│   │   │       └── LaufzeitSchicht[I].Istwert := 0
+│   │   │   ├── StueckSchicht_I_.Altwert := StueckSchicht_I_.Istwert
+│   │   │   ├── StueckSchicht_I_.Istwert := 0
+│   │   │   ├── StueckAuftragSchicht_I_.Altwert := StueckAuftragSchicht_I_.Istwert
+│   │   │   ├── StueckAuftragSchicht_I_.Istwert := 0
+│   │   │   └── LaufzeitSchicht_I_.Altwert := LaufzeitSchicht_I_.Istwert
+│   │   │       └── LaufzeitSchicht_I_.Istwert := 0
 │   │   ├── if SPC → SPC_Init
 │   │   └── if TPM_Auswertung → TPM_Schicht_Schicht3
 │   └── Result := True
