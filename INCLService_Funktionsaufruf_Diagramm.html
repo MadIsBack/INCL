@@ -238,7 +238,7 @@ graph TD
     G --> H[S7MainOK=True]
     H --> I[while not Terminated]
     I --> J[ServiceThread_ProcessRequests]
-    I --> K{S7MainOK?}
+    I --> K[S7MainOK?]
     K -->|Nein| L[S7Main_Free]
     L --> M[S7Main=TS7Main_Create]
     M --> H
@@ -247,10 +247,10 @@ graph TD
     
     %% Service-Events
     O[ServiceBeforeInstall] --> P[SetDBUser]
-    O --> Q[DisplayName=SERVICE_DISPLAY_NAME+UpperCase{DBUser}]
+    O --> Q[DisplayName=SERVICE_DISPLAY_NAME+UpperCase_DBUser]
     R[ServiceCreate] --> P
-    S[ServiceDestroy] --> T[SchreibeMeldung {Service Stop}]
-    U[ServiceShutdown] --> V[SchreibeMeldung {Service Shutdown}]
+    S[ServiceDestroy] --> T[SchreibeMeldung Service Stop]
+    U[ServiceShutdown] --> V[SchreibeMeldung Service Shutdown]
 </div>
 
 <hr>
@@ -330,13 +330,13 @@ graph TD
     
     P2 --> AE2[TimerEnd=Now]
     AE2 --> AF2[if TimerEnd - TimerBegin > 0_1]
-    AF2 -->|Ja| AG2[SchreibeMeldung {Timer1Timer took too long}]
+    AF2 -->|Ja| AG2[SchreibeMeldung Timer1Timer took too long]
     
     P2 -->|Exception| AH2[HandleSystemError]
     AH2 --> AI2[ErrorCount+=1]
-    AI2 --> AJ2{ErrorCount > 5?}
+    AI2 --> AJ2[ErrorCount > 5?]
     AJ2 -->|Ja| AK2[Daten_Enabled=False]
-    AJ2 -->|Ja| AL2[SchreibeMeldung {Error in Timer1Timer}]
+    AJ2 -->|Ja| AL2[SchreibeMeldung Error in Timer1Timer]
     AJ2 -->|Nein| AM2[Exit]
 </div>
 
@@ -504,11 +504,11 @@ graph TD
 <div class="mermaid">
 graph TD
     %% StartSchichtWechsel
-    A7[StartSchichtWechsel] --> B7[SchreibeMeldung {Schichtwechsel gestartet}]
+    A7[StartSchichtWechsel] --> B7[SchreibeMeldung Schichtwechsel gestartet]
     B7 --> C7[AlteSchicht=Schicht]
     C7 --> D7[Schicht=GetShiftNo Shift_Model_ Jetzt]
     D7 --> E7[if Schicht!=AlteSchicht]
-    E7 -->|Ja| F7[SchreibeMeldung {Schichtwechsel von }+IntToStrAlteSchicht+{ nach }+IntToStrSchicht]
+    E7 -->|Ja| F7[SchreibeMeldung Schichtwechsel von x nach y]
     E7 -->|Ja| G7[NeueSchicht AlteSchicht]
     G7 -->|True| H7[SchichtSpeicher=Schicht]
     H7 --> I7[for I=1 to Anzahl_Masch]
