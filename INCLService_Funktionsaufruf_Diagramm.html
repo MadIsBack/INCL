@@ -7,27 +7,27 @@
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            mermaid.initialize({{ theme: 'default' }});
+            mermaid.initialize({theme: 'default'});
             mermaid.init(undefined, document.querySelectorAll('.mermaid'));
         });
     </script>
     <style>
-        body {{
+        body {
             font-family: Arial, 'Segoe UI', sans-serif;
             line-height: 1.6;
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
             color: #333;
-        }}
-        h1, h2, h3, h4, h5, h6 {{
+        }
+        h1, h2, h3, h4, h5, h6 {
             color: #2c3e50;
             margin-top: 1.5em;
             margin-bottom: 0.5em;
-        }}
-        h1 {{ font-size: 2em; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
-        h2 {{ font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 5px; }}
-        .mermaid {{
+        }
+        h1 { font-size: 2em; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        h2 { font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .mermaid {
             max-width: 100%;
             margin: 20px 0;
             border: 1px solid #ddd;
@@ -35,73 +35,73 @@
             padding: 15px;
             background: #fafafa;
             overflow-x: auto;
-        }}
-        table {{
+        }
+        table {
             border-collapse: collapse;
             width: 100%;
             margin: 20px 0;
             font-size: 0.9em;
-        }}
-        th, td {{
+        }
+        th, td {
             border: 1px solid #ddd;
             padding: 8px;
             text-align: left;
-        }}
-        th {{
+        }
+        th {
             background-color: #f2f2f2;
             font-weight: bold;
-        }}
-        pre {{
+        }
+        pre {
             background: #f5f5f5;
             padding: 10px;
             border-radius: 4px;
             overflow-x: auto;
             font-size: 0.9em;
-        }}
-        code {{
+        }
+        code {
             background: #f5f5f5;
             padding: 2px 4px;
             border-radius: 3px;
             font-family: 'Courier New', monospace;
-        }}
-        blockquote {{
+        }
+        blockquote {
             border-left: 4px solid #3498db;
             margin: 1em 0;
             padding: 0.5em 1em;
             background: #f9f9f9;
-        }}
-        hr {{
+        }
+        hr {
             border: none;
             border-top: 1px solid #eee;
             margin: 2em 0;
-        }}
-        @media print {{
-            body {{ padding: 0; }}
-            .mermaid {{ 
+        }
+        @media print {
+            body { padding: 0; }
+            .mermaid {
                 page-break-inside: avoid;
                 background: white !important;
                 border: none !important;
-            }}
-            @page {{
+            }
+            @page {
                 size: A4 landscape;
                 margin: 1cm;
-            }}
-            table {{
+            }
+            table {
                 page-break-inside: auto;
-            }}
-            tr {{
+            }
+            tr {
                 page-break-inside: avoid;
                 page-break-after: auto;
-            }}
-        }}
+            }
+        }
     </style>
 </head>
 <body>
 <h1>📋 INCLService & Komponenten_V63 - Funktionsaufruf-Diagramm (Korrigiert)</h1>
 
-<p><strong>Erstellt am:<strong> 19.08.2026</p>
-<p><strong>Zweck:<strong> Übersicht über alle Funktionen, deren Aufrufreihenfolge und auslösende Ereignisse in den Verzeichnissen `INCLService` und `Komponenten_V63`.</p>
-<p><strong>Hinweis:<strong> Diese Version enthält <strong>korrigierte Mermaid-Diagramme<strong> (Abschnitte 3.1, 3.2, 3.3, 4.1, 5.1, 6.1, 10.1).</p>
+<p><strong>Erstellt am:</strong> 19.08.2026</p>
+<p><strong>Zweck:</strong> Übersicht über alle Funktionen, deren Aufrufreihenfolge und auslösende Ereignisse in den Verzeichnissen <code>INCLService</code> und <code>Komponenten_V63</code>.</p>
+<p><strong>Hinweis:</strong> Diese Version enthält <strong>korrigierte Mermaid-Diagramme</strong> (Abschnitte 3.1, 3.2, 3.3, 4.1, 5.1, 6.1, 10.1).</p>
 
 <hr>
 
@@ -614,35 +614,15 @@ graph TD
 
 <table>
 <tr><td>**Ereignis**</td><td>**Auslöser**</td><td>**Funktion**</td><td>**Datei**</td></tr>
-</table>
-<table>
-<tr><td>--------------</td><td>--------------</td><td>--------------</td><td>-----------</td></tr>
-</table>
-<table>
+<tr></tr>
 <tr><td>**ServiceExecute**</td><td>Dienst startet</td><td>Hauptzyklus</td><td>Main.pas</td></tr>
-</table>
-<table>
 <tr><td>**Timer1Timer**</td><td>Timer-Intervall (standardmäßig 15s)</td><td>Datenlesen und -verarbeitung</td><td>DBMain.pas</td></tr>
-</table>
-<table>
 <tr><td>**Event_Schicht**</td><td>Schichtwechsel erkannt</td><td>Berechnungen für neue Schicht</td><td>Th_Schicht.pas</td></tr>
-</table>
-<table>
 <tr><td>**Event_Zusatz**</td><td>Zusatzfunktionen ausführen</td><td>Verschiedene Berechnungen</td><td>Th_Zusatz.pas</td></tr>
-</table>
-<table>
 <tr><td>**Terminal_Menge_Gebucht**</td><td>Signal ändert sich</td><td>Menge_Gebucht</td><td>DBMain.pas</td></tr>
-</table>
-<table>
 <tr><td>**Terminal_Stillstand_Gebucht**</td><td>Signal ändert sich</td><td>Stillstand_Gebucht</td><td>DBMain.pas</td></tr>
-</table>
-<table>
 <tr><td>**Terminal_Auftrag_Beendet**</td><td>Signal ändert sich</td><td>Auftrag_Ende</td><td>DBMain.pas</td></tr>
-</table>
-<table>
 <tr><td>**Terminal_Auftrag_Unterbrochen**</td><td>Signal ändert sich</td><td>Auftrag_Unterbrechen</td><td>DBMain.pas</td></tr>
-</table>
-<table>
 <tr><td>**BCD_Read**</td><td>BCD-Schalter ändert sich</td><td>Auftrag_Starten_BCDCode</td><td>DBMain.pas</td></tr>
 </table>
 
@@ -652,7 +632,7 @@ graph TD
 
 <h3>📌 12.1. Service-Start und Initialisierung</h3>
 
-<pre><code>
+<pre><code class="language-">
 ServiceExecute
 ├── CheckDBVerbindung
 │   ├── TCO_Database.Create
@@ -673,13 +653,13 @@ ServiceExecute
     ├── Thread_Schicht.Create
     ├── Thread_Zusatz.Create
     └── Thread_SignalLog.Create
-<pre><code>
+<pre><code class="language-">
 
 ---
 
 ### 📌 12.2. Hauptzyklus (Timer1Timer)
 
-<pre><code>
+<pre><code class="language-">
 Timer1Timer
 ├── MainServiceAliveTimer.Alive
 ├── Jetzt := Now
@@ -729,13 +709,13 @@ Timer1Timer
 │   ├── if cSPC <> nil → SPC_Aktuelle_Werte_Schreiben
 │   └── TimerEnd := Now
 └── except → HandleSystemError
-<pre><code>
+<pre><code class="language-">
 
 ---
 
 ### 📌 12.3. Schichtwechsel-Prozess
 
-<pre><code>
+<pre><code class="language-">
 NeueSchicht
 ├── Schicht := GetShiftNo Shift_Model, Jetzt
 ├── if Schicht <> AlteSchicht
@@ -753,13 +733,13 @@ NeueSchicht
 │   │   └── if TPM_Auswertung → TPM_Schicht_Schicht3
 │   └── Result := True
 └── Result := False
-<pre><code>
+<pre><code class="language-">
 
 ---
 
 ### 📌 12.4. Thread_Zusatz-Prozess
 
-<pre><code>
+<pre><code class="language-">
 StartProgramme
 ├── Palette_Rest_Berechnen
 ├── TPM_Korrektur_Doppelte_Daten
@@ -780,7 +760,7 @@ StartProgramme
 ├── CheckAuftragKette
 ├── BerechnenEndeausIst
 └── Laufende_Auftraege_Terminieren
-<pre><code>
+<pre><code class="language-">
 
 ---
 
