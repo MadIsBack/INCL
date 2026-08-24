@@ -306,11 +306,11 @@ graph TD
 ```mermaid
 graph TD
     %% StartSchichtWechsel
-    A7[StartSchichtWechsel] --> B7[SchreibeMeldung {Schichtwechsel gestartet}]
+    A7[StartSchichtWechsel] --> B7[SchreibeMeldung Schichtwechsel gestartet]
     B7 --> C7[AlteSchicht=Schicht]
     C7 --> D7[Schicht=GetShiftNo Shift_Model_ Jetzt]
     D7 --> E7[if Schicht!=AlteSchicht]
-    E7 -->|Ja| F7[SchreibeMeldung {Schichtwechsel von }+IntToStrAlteSchicht+{ nach }+IntToStrSchicht]
+    E7 -->|Ja| F7[SchreibeMeldung Schichtwechsel von x nach y]
     E7 -->|Ja| G7[NeueSchicht AlteSchicht]
     G7 -->|True| H7[SchichtSpeicher=Schicht]
     H7 --> I7[for I=1 to Anzahl_Masch]
