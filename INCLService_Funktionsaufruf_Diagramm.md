@@ -49,10 +49,10 @@ graph TD
     
     %% Service-Events
     O[ServiceBeforeInstall] --> P[SetDBUser]
-    O --> Q[DisplayName=SERVICE_DISPLAY_NAME+UpperCase{DBUser}]
+    O --> Q[DisplayName=SERVICE_DISPLAY_NAME+UpperCase_DBUser]
     R[ServiceCreate] --> P
-    S[ServiceDestroy] --> T[SchreibeMeldung {Service Stop}]
-    U[ServiceShutdown] --> V[SchreibeMeldung {Service Shutdown}]
+    S[ServiceDestroy] --> T[SchreibeMeldung Service Stop]
+    U[ServiceShutdown] --> V[SchreibeMeldung Service Shutdown]
 ```
 
 ---
@@ -132,13 +132,13 @@ graph TD
     
     P2 --> AE2[TimerEnd=Now]
     AE2 --> AF2[if TimerEnd - TimerBegin > 0_1]
-    AF2 -->|Ja| AG2[SchreibeMeldung {Timer1Timer took too long}]
+    AF2 -->|Ja| AG2[SchreibeMeldung Timer1Timer took too long]
     
     P2 -->|Exception| AH2[HandleSystemError]
     AH2 --> AI2[ErrorCount+=1]
     AI2 --> AJ2{ErrorCount > 5?}
     AJ2 -->|Ja| AK2[Daten_Enabled=False]
-    AJ2 -->|Ja| AL2[SchreibeMeldung {Error in Timer1Timer}]
+    AJ2 -->|Ja| AL2[SchreibeMeldung Error in Timer1Timer]
     AJ2 -->|Nein| AM2[Exit]
 ```
 
