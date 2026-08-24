@@ -40,7 +40,7 @@ graph TD
     G --> H[S7MainOK=True]
     H --> I[while not Terminated]
     I --> J[ServiceThread_ProcessRequests]
-    I --> K{S7MainOK?}
+    I --> K[S7MainOK?]
     K -->|Nein| L[S7Main_Free]
     L --> M[S7Main=TS7Main_Create]
     M --> H
@@ -136,7 +136,7 @@ graph TD
     
     P2 -->|Exception| AH2[HandleSystemError]
     AH2 --> AI2[ErrorCount+=1]
-    AI2 --> AJ2{ErrorCount > 5?}
+    AI2 --> AJ2[ErrorCount > 5?]
     AJ2 -->|Ja| AK2[Daten_Enabled=False]
     AJ2 -->|Ja| AL2[SchreibeMeldung Error in Timer1Timer]
     AJ2 -->|Nein| AM2[Exit]
