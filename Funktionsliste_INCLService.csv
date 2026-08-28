@@ -1,0 +1,247 @@
+Datei;Klasse/Typ;Funktion;Rückgabewert;Parameter;Funktionalität
+DBMain.pas;TSignalMaschineItem;CopyMe;TSignalMaschineItem;-;Erstellt eine Kopie des aktuellen Signal-Maschinen-Items
+DBMain.pas;TSignalMaschineList;getItem;TSignalMaschineItem;index: Integer;Gibt das Item an der Position index zurück
+DBMain.pas;TSignalMaschineList;setItem;-;index: Integer; const Value: TSignalMaschineItem;Setzt das Item an der Position index
+DBMain.pas;TSignalMaschineList;Add;Integer;aSignalEintrag: TSignalMaschineItem;Fügt ein neues Item zur Liste hinzu und gibt den Index zurück
+DBMain.pas;TSignalMaschineList;GetByMaschNr;TSignalMaschineList;aMaschNr: Integer;Gibt eine neue Liste mit allen Items zurück, die zur Maschine aMaschNr gehören
+DBMain.pas;TSignalMaschineList;GetByMaschNrSignalart;TSignalMaschineItem;aMaschNr: Integer; aSignalart: Integer;Such ein Item nach Maschinennummer und Signalart und gibt es zurück (oder nil)
+DBMain.pas;TSignalMaschineList;GetNr;TSignalMaschineItem;aNr: Integer;Sucht ein Item nach Signalnummer aNr
+DBMain.pas;TSignalMaschineList;GetIstwertByNr;Integer;aNr: Integer;Gibt den Istwert eines Signals mit der Nummer aNr zurück (oder 0)
+DBMain.pas;TSignalMaschineList;GetBoolByNr;Boolean;aNr: Integer;Gibt den booleschen Istwert (True wenn 1) eines Signals mit der Nummer aNr zurück
+DBMain.pas;TSignalMaschineList;Clear;-;-;Löscht alle Items in der Liste (mit Speicherbereinigung)
+DBMain.pas;TSignalMaschineList;Destroy;-;-;Destructor: Löscht alle Items und die Liste selbst
+DBMain.pas;TS7Main;Create;-;(AOwner: TComponent) oder ohne Parameter in AZURE;Konstruktor: Initialisiert Datenbankverbindung, lädt Konfiguration aus incl_<DBUser>.ini, erstellt Timer, S7-Komponenten (TPM, cSPC, S7_Auftrag, INC_Meldung), lädt Maschinen- und Signal-Konfiguration
+DBMain.pas;TS7Main;Destroy;-;-;Destructor: Bereinigt alle Ressourcen (Timer, Threads, Datenbankverbindungen)
+DBMain.pas;TS7Main;Timer1Timer;-;Sender: TObject;Timer-Event-Handler: Wird periodisch aufgerufen, um Daten zu lesen (DatenLesen, DatenLesen2, DatenLesen_Metall)
+DBMain.pas;TS7Main;Create_Threads;-;-;Erstellt Hintergrund-Threads für Schichtberechnung, Zusatzfunktionen, Signal-Logging und Backup
+DBMain.pas;TS7Main;In_SPSWerteDB;-;-;Liest SPS-Werte aus der Datenbank und aktualisiert die internen Signal-Strukturen
+DBMain.pas;TS7Main;Schreibe_SPS_Wert;-;MaschNr: Integer; SignalNr: Integer; Wert: Integer;Schreibt einen Wert in die SPS für eine bestimmte Maschine und Signalnummer
+DBMain.pas;TS7Main;DatenLesen;-;-;Hauptfunktion zum Lesen von SPS-Daten: Liest alle Maschinen-Signale (Stückzahlen, Taktzeiten, Betriebsstunden, etc.) und aktualisiert die Includis-Datenstruktur
+DBMain.pas;TS7Main;DatenLesen2;-;-;Erweiterte Datenlesung: Liest zusätzliche Signale (z. B. Barcodes, Terminal-Eingaben)
+DBMain.pas;TS7Main;DatenLesen_Metall;-;-;Spezielle Datenlesung für Metall-Bearbeitung
+DBMain.pas;TS7Main;GetStueckAuftragAlt;Longint;index: Integer;Gibt den alten Stückzahlwert für einen Auftrag zurück (für Differenzberechnung)
+DBMain.pas;TS7Main;CheckManuelleStueckBuchung;Boolean;index: Integer;Prüft, ob eine manuelle Stückbuchung für eine Maschine vorliegt
+DBMain.pas;TS7Main;NeueSchicht;Boolean;var AlteSchicht: Integer;Prüft, ob ein Schichtwechsel stattgefunden hat und aktualisiert AlteSchicht
+DBMain.pas;TS7Main;CheckRoteLampeAus;Boolean;-;Prüft, ob die Rote Lampe (Störsignal) ausgeschaltet werden soll
+DBMain.pas;TS7Main;Hole_Daten_Tabelle;-;Datentyp: Integer;Lädt Daten aus Tabellen (z. B. für SPC, TPM)
+DBMain.pas;TS7Main;HandleSystemError;-;Sender: TObject; E: Exception; aCustomString: string;Fehlerbehandlung: Loggt Systemfehler und versucht ggf. eine Datenbank-Wiederherstellung
+Main.pas;TINCLServ;ServiceExecute;-;Sender: TService;Hauptausführungslogik des Services: Initialisiert Datenbankverbindung, startet S7Main, überwacht Service-Status
+Main.pas;TINCLServ;ServiceBeforeInstall;-;Sender: TService;Vor der Installation: Setzt DB-User und Service-Namen
+Main.pas;TINCLServ;ServiceCreate;-;Sender: TObject;Bei Service-Erstellung: Setzt DB-User und Service-Namen
+Main.pas;TINCLServ;ServiceDestroy;-;Sender: TObject;Bei Service-Zerstörung: Loggt Service-Stopp
+Main.pas;TINCLServ;ServicePause;-;Sender: TService; var Paused: Boolean;Bei Pause: Loggt Pause
+Main.pas;TINCLServ;ServiceContinue;-;Sender: TService; var Continued: Boolean;Bei Fortsetzung: Setzt Continued = True
+Main.pas;TINCLServ;ServiceAfterInstall;-;Sender: TService;Nach der Installation: Schreibt Service-Beschreibung und Parameter in die Registry
+Main.pas;TINCLServ;ServiceShutdown;-;Sender: TService;Bei Herunterfahren: Loggt Shutdown
+Main.pas;TINCLServ;SetDBUser;-;-;Lädt DB-Parameter aus Command-Line-Parametern oder Registry (DBUSER=, DBSERVER=, DBPASS=)
+Main.pas;TINCLServ;GetServiceController;TServiceController;-;Gibt den Service-Controller zurück
+Main.pas;-;ForceBackSlash;string;S: string;Fügt einen Backslash am Ende eines Pfads hinzu, falls nicht vorhanden
+Main.pas;-;SchreibeMeldung;-;Meldung: string; Modus: Integer;Schreibt eine Log-Nachricht in eine Datei (svc_<DBUser>_<Modus>.log). Modus bestimmt den Dateinamen (0=Trace, 1=Timer, 2=Shift, etc.)
+Main.pas;-;CheckDBVerbindung;Boolean;-;Prüft die Datenbankverbindung und gibt True zurück, wenn erfolgreich
+SchichtUtilLib.pas;TStillstandEintrag;CopyMe;TStillstandEintrag;-;Erstellt eine Kopie des Stillstands-Eintrags
+SchichtUtilLib.pas;TStillstandEintragsListe;Add;Integer;aStillstandEintrag: TStillstandEintrag;Fügt einen Stillstands-Eintrag hinzu (vermeidet Duplikate)
+SchichtUtilLib.pas;TStillstandEintragsListe;AddRaw;Integer;aStillstandEintrag: TStillstandEintrag;Fügt einen Stillstands-Eintrag ohne Duplikatsprüfung hinzu
+SchichtUtilLib.pas;TStillstandEintragsListe;GetDauerByMaschNr;Integer;aMaschNr: Integer;Berechnet die gesamte Stillstandsdauer (in Minuten) für eine Maschine
+SchichtUtilLib.pas;TStillstandEintragsListe;GetDauerByMaschNrFromDate;Integer;aFromDate: TDateTime; aMaschNr: Integer;Berechnet die Stillstandsdauer ab einem bestimmten Datum für eine Maschine
+SchichtUtilLib.pas;TStillstandEintragsListe;GetOpenByMaschNr;TStillstandEintrag;aMaschNr: Integer;Gibt den offenen (unbeendeten) Stillstand für eine Maschine zurück
+SchichtUtilLib.pas;TStillstandEintragsListe;getItem;TStillstandEintrag;index: Integer;Zugriff auf Listenelemente
+SchichtUtilLib.pas;TStillstandEintragsListe;setItem;-;index: Integer; const Value: TStillstandEintrag;Zugriff auf Listenelemente
+SchichtUtilLib.pas;TStillstandEintragsListe;GetByMaschNr;TStillstandEintragsListe;aMaschNr: Integer;Gibt eine neue Liste mit allen Stillständen für eine Maschine zurück
+SchichtUtilLib.pas;TStillstandEintragsListe;getMaschNrsString;string;-;Gibt eine kommagetrennte Liste aller Maschinen-IDs in der Liste zurück
+SchichtUtilLib.pas;TStillstandEintragsListe;Clear;-;-;Löscht alle Einträge (mit Speicherbereinigung)
+SchichtUtilLib.pas;TStillstandEintragsListe;Destroy;-;-;Löscht alle Einträge (mit Speicherbereinigung)
+SchichtUtilLib.pas;TStartStopEintrag;CopyMe;TStartStopEintrag;-;Erstellt eine Kopie des Start/Stop-Eintrags
+SchichtUtilLib.pas;TStartStopEintragsListe;Add;Integer;aStartStopEintrag: TStartStopEintrag;Fügt einen Start/Stop-Eintrag hinzu
+SchichtUtilLib.pas;TStartStopEintragsListe;GetByBetriebsauftragNr;TStartStopEintragsListe;aBANr: string;Gibt eine neue Liste mit allen Start/Stop-Einträgen für eine Betriebsauftragsnummer zurück
+SchichtUtilLib.pas;TStartStopEintragsListe;getItem;TStartStopEintrag;index: Integer;Zugriff auf Listenelemente
+SchichtUtilLib.pas;TStartStopEintragsListe;setItem;-;index: Integer; const Value: TStartStopEintrag;Zugriff auf Listenelemente
+SchichtUtilLib.pas;TStartStopEintragsListe;Clear;-;-;Löscht alle Einträge (mit Speicherbereinigung)
+SchichtUtilLib.pas;TStartStopEintragsListe;Destroy;-;-;Löscht alle Einträge (mit Speicherbereinigung)
+SchichtUtilLib.pas;TSignalLogEintrag;CopyMe;TSignalLogEintrag;-;Erstellt eine Kopie des Signal-Log-Eintrags
+SchichtUtilLib.pas;TSignalLogEintragListe;Add;Integer;aSignalLogEintrag: TSignalLogEintrag;Fügt einen Signal-Log-Eintrag hinzu
+SchichtUtilLib.pas;TSignalLogEintragListe;GetByMaschNr;TSignalLogEintragListe;aMaschNr: Integer;Gibt eine neue Liste mit allen Signal-Logs für eine Maschine zurück
+SchichtUtilLib.pas;TSignalLogEintragListe;getItem;TSignalLogEintrag;index: Integer;Zugriff auf Listenelemente
+SchichtUtilLib.pas;TSignalLogEintragListe;setItem;-;index: Integer; const Value: TSignalLogEintrag;Zugriff auf Listenelemente
+SchichtUtilLib.pas;TSignalLogEintragListe;Clear;-;-;Löscht alle Einträge (mit Speicherbereinigung)
+SchichtUtilLib.pas;TSignalLogEintragListe;Destroy;-;-;Löscht alle Einträge (mit Speicherbereinigung)
+SQL_fuc.pas;-;Handle_DB_Error;Boolean;E: string;Behandelt Datenbankfehler (z. B. ORA-01000 für zu viele Cursor) und versucht eine Neuverbindung
+SQL_fuc.pas;-;RestartDatabase;Boolean;-;Schließt die aktuelle Verbindung und versucht eine Neuverbindung
+SQL_fuc.pas;-;SQL_Get;Boolean;Query: TCO_Query; SQLStr: string;Führt eine SQL-Abfrage aus und gibt True zurück, wenn Daten gefunden wurden
+SQL_fuc.pas;-;SQL_Insert;integer;Query: TCO_Query; SQLStr: string;Führt ein SQL-Insert/Update/Delete aus und gibt die Anzahl der betroffenen Zeilen zurück
+SQL_fuc.pas;-;SQLGetBool;Boolean;Query: TCO_Query; Tabelle: string; Feld: string; Wert: string;Prüft, ob ein Datensatz in einer Tabelle existiert (einfache Bedingung)
+SQL_fuc.pas;-;SQL2GetBool;Boolean;Query: TCO_Query; Tabelle: string; Feld: string; Wert: string; Feld2: string; Wert2: string;Prüft, ob ein Datensatz existiert (zwei Bedingungen)
+SQL_fuc.pas;-;SQL3GetBool;Boolean;Query: TCO_Query; Tabelle: string; Feld: string; Wert: string; Feld2: string; Wert2: string; Feld3: string; Wert3: string;Prüft, ob ein Datensatz existiert (drei Bedingungen)
+SQL_fuc.pas;-;SQLGet;Integer;Query: TCO_Query; Tabelle: string; Feld: string; Wert: string; Ergebnis: Boolean;Gibt die Anzahl der Datensätze zurück, wenn Ergebnis=True, sonst lädt die Daten
+SQL_fuc.pas;-;SQL2Get;Integer;Query: TCO_Query; Tabelle: string; Feld: string; Wert: string; Feld2: string; Wert2: string; Ergebnis: Boolean;Wie SQLGet, aber mit zwei Bedingungen
+SQL_fuc.pas;-;SQL3Get;Integer;Query: TCO_Query; Tabelle: string; Feld: string; Wert: string; Feld2: string; Wert2: string; Feld3: string; Wert3: string; Ergebnis: Boolean;Wie SQLGet, aber mit drei Bedingungen
+SQL_fuc.pas;-;UpdateSQL;-;Query: TCO_Query; Tabelle: string; UpdateFeld: string; UpdateWert: string; WhereFeld: string; WhereWert: string;Führt ein SQL-Update mit einer Bedingung aus
+SQL_fuc.pas;-;Update2SQL;-;Query: TCO_Query; Tabelle: string; UpdateFeld: string; UpdateWert: string; WhereFeld: string; WhereWert: string; WhereFeld2: string; WhereWert2: string;Führt ein SQL-Update mit zwei Bedingungen aus
+SQL_fuc.pas;-;DeleteSQL;-;Query: TCO_Query; Tabelle: string; Feld: string; Wert: string;Löscht Datensätze aus einer Tabelle
+SQL_fuc.pas;-;GetGlobalMemory_MB;string;-;Gibt eine Zusammenfassung des Arbeitsspeichers (in MB) zurück (Total, Free, PageFile, etc.)
+SQL_fuc.pas;-;CurrentProcessMemory_KBInt;Integer;-;Gibt den Arbeitsspeicherverbrauch des aktuellen Prozesses in KB zurück
+SQL_fuc.pas;-;CurrentProcessMemory_KB;string;-;Gibt den Arbeitsspeicherverbrauch als formatierten String zurück (z. B. "  12345 [  65432]")
+SQL_fuc.pas;-;FloatToStr2;string;Value: Extended;Konvertiert einen Extended-Wert in einen String (mit korrektem Dezimaltrennzeichen für die Datenbank)
+SQL_fuc.pas;-;FloatToStrF2;string;Value: Extended; Format: TFloatFormat; Precision, Digits: Integer;Konvertiert einen Extended-Wert in einen formatierten String
+SQL_fuc.pas;-;FloatToPunktStringF2;string;Value: Extended; Format: TFloatFormat; Precision, Digits: Integer;Wie FloatToStrF2, aber mit Punkt als Dezimaltrennzeichen (für Oracle)
+Th_Schicht.pas;TThread_Schicht;Create;-;Suspended: Boolean;Konstruktor: Initialisiert Datenbankverbindungen, TPM/SPC-Objekte, Alive-Timer
+Th_Schicht.pas;TThread_Schicht;Destroy;-;-;Destructor: Bereinigt alle Ressourcen (Queries, TPM/SPC-Objekte, Timer)
+Th_Schicht.pas;TThread_Schicht;Execute;-;-;Thread-Hauptschleife: Wartet auf Event_Schicht, prüft Datenbankverbindung und führt entweder Schichtwechsel oder Neuberechnung aus
+Th_Schicht.pas;TThread_Schicht;GetSignalNr;Integer;Query: TCO_Query; SignalArt: Integer;Gibt die Signalnummer für eine bestimmte Signalart zurück
+Th_Schicht.pas;TThread_Schicht;Schichtwechsel;Boolean;-;Führt Schichtwechsel-Logik aus (z. B. Zurücksetzen von Schichtzählern, Signale schreiben)
+Th_Schicht.pas;TThread_Schicht;StartSchichtWechsel;-;AlteSchicht: Integer;Startet den Schichtwechsel-Prozess (Korrekturen, TPM-Berechnungen, SPC, Stillstandsberechnung)
+Th_Schicht.pas;TThread_Schicht;Berechne_Stillstaende_Schicht;-;aTage: Integer;Berechnet Stillstände pro Schicht für die letzten aTage Tage (Splitten von Stillständen über Schichtgrenzen)
+Th_Schicht.pas;TThread_Schicht;TPM_Schicht_Schicht3;-;-;Korrigiert Schichtzeiten für Schicht 3 (falls Schichtende vor Mitternacht liegt)
+Th_Schicht.pas;TThread_Schicht;TPM_Schicht_Pruefen;-;Tage: Integer;Prüft, ob TPM-Schicht-Einträge für alle Maschinen und Tage existieren, und erstellt fehlende Einträge
+Th_Schicht.pas;TThread_Schicht;Berechne_A_Daten;-;Von, Bis: Real; MNrs: string;Berechnet A-Felder (Anlagenausfall, Ruesten, Logistik) für TPM-Schicht
+Th_Schicht.pas;TThread_Schicht;TPM_Stillog_Korrektur;-;Arc_Tag, Kor_Tag: Integer;Archiviert alte Stillstände in TPM_Stillog_Arc und korrigiert Überlappungen
+Th_Schicht.pas;TThread_Schicht;Berechne_TPM_Produktionsdetail;-;Days: Integer; MNrs: string;Berechnet Produktionsdetails (Leistung, Ausschuss, OEE) für TPM-Auswertung
+Th_Schicht.pas;TThread_Schicht;Berechne_TPM_ProduktionsdetailDebug;-;Start: Extended; Days: Integer; MNrs: string;Wie Berechne_TPM_Produktionsdetail, aber für einen spezifischen Zeitraum
+Th_Schicht.pas;TThread_Schicht;TPM_Korrektur;-;Von, Bis: Real; Berechnen_TPM_Auswertung: Boolean; MNrs: string;Hauptfunktion für TPM-Korrekturen: Berechnet TPM-Daten für einen Zeitraum
+Th_Schicht.pas;TThread_Schicht;TPM_Stillog_Korrektur;-;Arc_Tag, Kor_Tag: Integer;Korrigiert Stillstands-Logs (Archivierung, Überlappungen, Dauerberechnung)
+Th_Schicht.pas;TThread_Schicht;Berechne_TPM_Auftragsdetail;-;Days: Integer; MNrs: string;Berechnet Auftragsdetails (Produzierte Menge, Taktzeiten, etc.)
+Th_Schicht.pas;TThread_Schicht;Berechne_TPM_Auswertung;-;Von, Bis: TDateTime; MNRs: string;Berechnet TPM-Auswertungsdaten (Leistung, Effektivität, etc.)
+Th_Schicht.pas;TThread_Schicht;TPM_AuswertungKorrektur;-;-;Korrigiert TPM-Auswertungsdaten (z. B. Nullwerte, negative Werte)
+Th_Schicht.pas;TThread_Schicht;Berechne_TPM_Schicht_Verpackt_Ausschuss;-;Days: Integer; MNrs: string;Berechnet Verpackte Mengen und Ausschuss pro Schicht
+Th_Schicht.pas;TThread_Schicht;Nachbuchen_aus_AArchiv;-;Days: Integer; MNrs: string;Nachbuchung von Daten aus dem Archiv (z. B. für laufende Aufträge)
+Th_Schicht.pas;TThread_Schicht;Berechne_Extrusion;-;TPMNr: Integer; AuftragNr: string; Von, Bis: Real;Spezielle Berechnung für Extrusion (z. B. Materialverbrauch)
+Th_Schicht.pas;TThread_Schicht;TPM_Leistung_Gesamt_Update;-;-;Unfug-Funktion (veraltet, wahrscheinlich nicht mehr verwendet)
+Th_Schicht.pas;TThread_Schicht;TPM_Produziert_Gesamt_Update;-;-;Unfug-Funktion (veraltet)
+Th_Schicht.pas;TThread_Schicht;GetStillZeit;-;VonDatum, BisDatum: TDateTime; MaschNr, Stillstandnr: Integer; AStart, AEnde: Real; var Dauer, Anzahl, ADauer: Integer;Berechnet Stillstandszeiten für eine Maschine und Stillstandsnummer
+Th_Schicht.pas;TThread_Schicht;GetArtikelNr;string;AuftragNr: string;Gibt die Artikelnummer für eine Auftragsnummer zurück
+Th_Schicht.pas;TThread_Schicht;SetNachBerechnung;-;const Value: Boolean;Setzt den Nachberechnungsmodus (für Recalculation)
+Th_Schicht.pas;TThread_Schicht;Recalculation;Integer;-;Führt eine komplette Neuberechnung aller TPM-Daten durch (für einen konfigurierten Zeitraum)
+Th_Zusatz.pas;TThread_Zusatz;Create;-;Suspended: Boolean;Konstruktor: Initialisiert Datenbankverbindungen, Queries, Alive-Timer
+Th_Zusatz.pas;TThread_Zusatz;Destroy;-;-;Destructor: Bereinigt alle Ressourcen
+Th_Zusatz.pas;TThread_Zusatz;Execute;-;-;Thread-Hauptschleife: Wartet auf Event_Zusatz und führt StartProgramme aus
+Th_Zusatz.pas;TThread_Zusatz;StartProgramme;-;-;Hauptfunktion: Ruft alle Zusatzfunktionen auf (je nach Konfiguration)
+Th_Zusatz.pas;TThread_Zusatz;CreateAddonAliveTimer;-;-;Erstellt einen Alive-Timer für den Zusatz-Thread
+Th_Zusatz.pas;TThread_Zusatz;Palette_Rest_Berechnen;-;-;Berechnet Rest-Paletten für Aufträge (basierend auf Sollwert und Verpackt)
+Th_Zusatz.pas;TThread_Zusatz;TPM_Korrektur_Doppelte_Daten;-;-;Löscht doppelte TPM-Schicht-Einträge (gleiche Maschine, Datum, Schicht, Auftrag)
+Th_Zusatz.pas;TThread_Zusatz;WZReparatur;-;-;Werkzeug-Reparatur: Markiert Reparaturen als erledigt und erstellt Jobs für Wartungen
+Th_Zusatz.pas;TThread_Zusatz;Check_TaktLog;-;-;Prüft und korrigiert Taktzeit-Logs (z. B. fehlende Einträge, falsche Zeiten)
+Th_Zusatz.pas;TThread_Zusatz;Job_No_to_Downtime_Log;-;-;Stillstands-Logging: Ordnet Stillstände Aufträgen zu und korrigiert TPM_Stillog
+Th_Zusatz.pas;TThread_Zusatz;CheckRuestProt_Stillog;-;-;Rüstprotokoll: Überträgt Stillstände der Gruppe "Rüsten" in das Rüstprotokoll
+Th_Zusatz.pas;TThread_Zusatz;Laufzeit_Berechnen;-;-;Berechnet Laufzeiten für Aufträge (aus Start- und Enddatum)
+Th_Zusatz.pas;TThread_Zusatz;Laufzeit_Berechnen2;-;-;Erweiterte Laufzeitberechnung (z. B. für laufende Aufträge)
+Th_Zusatz.pas;TThread_Zusatz;Book_Short_Delay;-;-;Automatische Buchung kurzer Stillstände: Buchung von Stillständen < SHORT_DELAY_AUTO_BOOK_VALUE Minuten als "Short Stop" (StillstandNr 5)
+Th_Zusatz.pas;TThread_Zusatz;CheckVerpacktProt;-;-;Prüft und korrigiert Verpackungsprotokolle (Datum, Artikelnummer, Maschine)
+Th_Zusatz.pas;TThread_Zusatz;CheckPackSchicht;Integer;aTage: Integer;Berechnet Verpackte Mengen pro Schicht für die letzten aTage Tage
+Th_Zusatz.pas;TThread_Zusatz;ArbeitsFrei_Buchen;-;-;Arbeitsfrei-Buchung: Buchen von Stillständen für Arbeitsfreie Zeiten (Feiertage, Pausen)
+Th_Zusatz.pas;TThread_Zusatz;Taktzeit_Personal;-;-;Berechnet Taktzeiten pro Personal (für Auswertung)
+Th_Zusatz.pas;TThread_Zusatz;TaktMitteln;-;aUpdate: Boolean;Mittelt Taktzeiten für Maschinen (z. B. für den ersten Schuss)
+Th_Zusatz.pas;TThread_Zusatz;UnscheduledSetup;-;-;Ungeplante Rüstzeiten: Identifiziert und korrigiert ungeplante Rüstzeiten
+Th_Zusatz.pas;TThread_Zusatz;CheckSollstueck;-;-;Prüft Sollstückzahlen für Aufträge (Konsistenz mit PDE)
+Th_Zusatz.pas;TThread_Zusatz;CheckWzWartungen;-;-;Prüft Werkzeug-Wartungen und erstellt Jobs für fällige Wartungen
+Th_Zusatz.pas;TThread_Zusatz;CheckAuftragKette;-;-;Prüft Auftragsketten (z. B. für Folgeaufträge)
+Th_Zusatz.pas;TThread_Zusatz;Reschedule;-;-;Neuplanung: Passt Auftragszeiten an (z. B. bei Verzögerungen)
+Th_Zusatz.pas;TThread_Zusatz;BerechnenEndeausIst;-;-;Berechnet Endezeiten aus Ist-Daten (z. B. wenn Enddatum = 0)
+Th_Zusatz.pas;TThread_Zusatz;Laufende_Auftraege_Terminieren;Boolean;-;Terminiert laufende Aufträge (setzt Enddatum basierend auf Taktzeit und produzierter Menge)
+Th_Zusatz.pas;TThread_Zusatz;Autoterminierung;Boolean;-;Automatische Terminierung: Terminiert Aufträge automatisch (falls konfiguriert)
+Th_Zusatz.pas;TThread_Zusatz;Status_Beschreibung;-;-;Aktualisiert Status-Beschreibungen für Maschinen
+Th_Zusatz.pas;TThread_Zusatz;PlanListeReportParameterSchreiben;-;Par, Val: string;Schreibt Report-Parameter für Planlisten
+Th_Zusatz.pas;TThread_Zusatz;CalcPackedlogFromShiftlog;-;-;Berechnet Verpackungsprotokolle aus Schichtprotokollen (für PackedLogFromShiftLog)
+Th_Zusatz.pas;TThread_Zusatz;CalcPackedlogFromShiftlog;-;fromdate: TDateTime;Wie oben, aber ab einem bestimmten Datum
+arbeit.pas;-;CCC_Init;-;-;Initialisiert alle Maschinen- und Auftragsdaten aus der Datenbank (Maschine, PDE, MDE, Taktoptionen, Stillstände)
+arbeit.pas;-;CCC_SetSchichtKonstante;-;-;Setzt Schichtkonstanten (Schicht1, Schicht2, Schicht3, etc.) aus der Datenbank
+arbeit.pas;-;CCC_GetMaschIndex;Integer;Lizenz: string;Gibt den Index einer Maschine in Includis basierend auf der Lizenz zurück
+arbeit.pas;-;CCC_GetMaschNrLizenz;string;Lizenz: string;Gibt die Maschinennummer für eine Lizenz zurück
+arbeit.pas;-;CCC_GetMaschZustand;Integer;Lizenz: string;Gibt den aktuellen Zustand einer Maschine zurück
+arbeit.pas;-;TTT_GetMaschNr;Integer;Lizenz: string;Gibt die Maschinennummer (Datenblock) für eine Lizenz zurück
+arbeit.pas;-;TTT_GetMaschine;string;MaschNr: Integer;Gibt den Maschinen-Namen für eine Maschinen-ID zurück
+arbeit.pas;-;GetDBNr;Integer;SignalNr: Integer; MaschNr: Integer;Gibt die Datenbank-Nummer für ein Signal und eine Maschine zurück
+arbeit.pas;-;LoadSignals;-;Q: TCO_Query;Lädt Signaldefinitionen aus der Datenbank
+arbeit.pas;-;MakeEnviroment;-;Q: TCO_Query;Initialisiert Umgebungsvariablen (z. B. Schichtzeiten)
+arbeit.pas;-;CCC_Daten_Aktualisieren;-;-;Hauptfunktion: Aktualisiert alle Maschinen- und Auftragsdaten (Zustände, Stückzahlen, Laufzeiten, etc.)
+arbeit.pas;-;CCC_Daten_Schreiben;-;-;Schreibt aktualisierte Daten in die Datenbank (z. B. Stückzahlen, Laufzeiten)
+arbeit.pas;-;CCC_Zeiten_Aufrunden;-;-;Rundet Zeitwerte (z. B. Laufzeiten) auf
+arbeit.pas;-;CCC_TPM_BCD_Meldung;-;-;Verarbeitet BCD-Meldungen (z. B. für Auftragsstart über BCD-Schalter)
+arbeit.pas;-;CCC_Auftrag_Starten_BCDCode;-;Lizenz: string; Ruesten: Boolean;Startet einen Auftrag über BCD-Code
+arbeit.pas;-;CCC_TPM_Stillstand_Check;-;-;Prüft Stillstände und aktualisiert TPM-Daten
+arbeit.pas;-;CCC_CheckRuestprot_Arbeitsfrei;-;-;Prüft Arbeitsfreie Zeiten im Rüstprotokoll
+arbeit.pas;-;CCC_CheckPause;-;-;Prüft Pausen und aktualisiert Maschinenstatus
+arbeit.pas;-;CCC_RoteLampeCheckAus;-;Lizenz: string;Prüft, ob die Rote Lampe (Störsignal) ausgeschaltet werden soll
+arbeit.pas;-;CCC_CheckStatusTPM_Stillog;-;-;Prüft Statusänderungen und aktualisiert TPM/Stillog
+arbeit.pas;-;CCC_TPM_Zustandswechsel;-;MaschNr: string; Datenblock, ZustandAlt, ZustandNeu: Integer; Schicht: string; Schuss, Prod: Integer; AfGesperrt: boolean;Verarbeitet Zustandswechsel einer Maschine (z. B. von "Läuft" zu "Rüsten")
+arbeit.pas;-;CCC_MDEWerte_fuellen;-;-;Füllt MDE-Werte (Maschinendatenerfassung) für BDE
+arbeit.pas;-;CCC_MDE_Soll_Ist_Vergleich;-;-;Vergleicht Soll- und Ist-Werte für MDE
+arbeit.pas;-;CCC_Erzeuge_Arbeitsplan;-;Lizenz: string; MaschNr: string; Signal: string; Sollwert: string; Bezeichnung: string; Zustaendig: string; Vorwarnung: Boolean; VorwarnungSTR: string; BDE_Ver: Boolean; RoteLampeAn: Boolean;Erstellt einen Arbeitsplan für eine Maschine
+arbeit.pas;-;CCC_Job_erzeugen;-;Q: TCO_Query; Lizenz, Bezeichnung, Quelle, Signal, Zustaendig, Status: string; Rote_lampe: Boolean; Zyklus: Integer;Erstellt einen Job (z. B. für Stillstandsmeldungen)
+arbeit.pas;-;CCC_Telegramm_Auswerten;-;-;Verarbeitet Telegramme (z. B. Barcode-Daten)
+arbeit.pas;-;CCC_Barcode_auswerten;-;BC1, BC2, BC3: string;Verarbeitet Barcode-Daten von bis zu 3 Barcode-Lesern
+arbeit.pas;-;CCC_Check_TerminOrder;-;-;Prüft Terminaufträge (z. B. für automatische Startzeiten)
+arbeit.pas;-;CCC_GetWerkzeugNr;string;Schluessel: Integer;Gibt die Werkzeugnummer für einen Schlüssel zurück
+arbeit.pas;-;CCC_Material_ausbuchen;-;MaterialEAN: string; Menge: Integer; Bedienernr: string;Bucht Materialverbrauch aus
+arbeit.pas;-;CCC_Schreibe_Signallog;-;Kommt: Boolean; First: Boolean; FehlerNr: Integer; Schicht: string; Status: string; Ursache: string; Wirkung: string; MaschNr: string;Schreibt ein Signal-Log (z. B. für Stillstandsmeldungen)
+arbeit.pas;-;CCC_Auftrag_Start_Barcode;-;BarCodeNr: Byte;Startet einen Auftrag über Barcode
+arbeit.pas;-;CCC_Check_Auftrag_Freigabe;-;-;Prüft Auftragsfreigaben (z. B. über Terminal)
+arbeit.pas;-;CCC_Schreibe_Maschinen_Status;-;-;Schreibt den Maschinenstatus in die Datenbank
+arbeit.pas;-;CCC_Check_Menge_Gebucht;-;-;Prüft, ob eine Mengenbuchung vorliegt
+arbeit.pas;-;CCC_Check_Terminal_Auftrag_Ende;-;-;Prüft Auftragsende-Meldungen vom Terminal
+arbeit.pas;-;CCC_Check_Terminal_Auftrag_Unterbrochen;-;-;Prüft Auftragsunterbrechungen vom Terminal
+arbeit.pas;-;CCC_Check_Terminal_Stillstand;-;-;Prüft Stillstandsmeldungen vom Terminal
+arbeit.pas;-;CCC_Check_Warmtrennen;-;-;Prüft Warmtrenn-Signale (z. B. für Maschinen mit Warmtrennfunktion)
+arbeit.pas;-;CCC_Check_Job_Stueckzahl;-;-;Prüft Job-Stückzahlen (z. B. für SPC)
+arbeit.pas;-;CCC_Check_StillstandNr_SPS;-;-;Prüft Stillstandsnummern aus der SPS
+arbeit.pas;-;CCC_UeberwachungszeitBerechnen;-;MaschNr: Integer;Berechnet Überwachungszeiten für eine Maschine
+arbeit.pas;-;CCC_QS_Jobs;-;-;Verarbeitet QS-Jobs (Qualitätssicherung)
+arbeit.pas;-;CCC_A_Felder_Schicht_Berechnen;-;aQ1, aQ2, aU: TCO_Query; aSchichtstart: Extended; aSchicht: Integer;Berechnet A-Felder (Anlagenausfall, Ruesten, Logistik) pro Schicht
+arbeit.pas;-;CCC_A_Felder_Schicht_Berechnen2;-;aQ1, aQ2, aU: TCO_Query; aSchichtstart: Extended; aSchicht: Integer;Alternative Berechnung für A-Felder
+arbeit.pas;-;CCC_TaktzeitIstSchreiben;-;-;Schreibt Ist-Taktzeiten in die Datenbank
+arbeit.pas;-;CheckJobPrestart;-;-;Prüft Job-Prestart-Bedingungen
+arbeit.pas;-;CCC_Auto_Ruesten2;-;-;Automatisches Rüsten für Aufträge
+arbeit.pas;-;CCC_InsertStillGehtEvent;-;KeyNr: string;Fügt ein Stillstands-Event ein
+arbeit.pas;-;CCC_SchreibeSystemID;-;-;Schreibt System-ID in die Datenbank
+arbeit.pas;-;CCC_CheckLicenses;Boolean;-;Prüft Lizenzen für Maschinen
+arbeit.pas;-;CCC_FolgeAuftrag_Starten;-;-;Startet Folgeaufträge automatisch (falls konfiguriert)
+arbeit.pas;-;CCC_SetSchichtKonstante;-;-;Setzt Schichtkonstanten
+arbeit.pas;-;CCC_Verpackt_aus_Ausschuss_Berechnen;-;-;Berechnet Verpackte Mengen aus Ausschuss (falls konfiguriert)
+arbeit.pas;-;CCC_Maschinen_Wartung;-;-;Verarbeitet Maschinenwartungen
+arbeit.pas;-;CCC_CheckBlock;-;-;Prüft Blockierungen (z. B. für Stillstände)
+arbeit.pas;-;CCC_CheckBypass;-;-;Prüft Bypass-Modus (z. B. für Testzwecke)
+arbeit.pas;-;CCC_CheckUnterbrocheneAuftraege;-;-;Prüft unterbrochene Aufträge und setzt sie ggf. fort
+arbeit.pas;-;CCC_GetTPMSchichtAnfang;Real;Schicht: Integer; DatumZeit: Real;Gibt den Anfang einer Schicht als TDateTime zurück
+arbeit.pas;-;CCC_Taktzeit_Aus_Stamm_Update;-;-;Aktualisiert Taktzeiten aus Stammdaten
+arbeit.pas;-;CCC_JobSetupAndRestart;-;aCOAuftrag: TCO_Auftrag;Job-Setup und Neustart für Aufträge
+arbeit.pas;-;CCC_Calc_R2_Times;-;-;Berechnet R2-Zeiten (z. B. für Rüstzeiten)
+arbeit.pas;-;CCC_AutoSetup2;-;-;Automatisches Setup für Aufträge (z. B. für Folgeaufträge)
+arbeit.pas;-;TTT_GetTPMSchichtZeit;Real;Schicht: Integer; DatumZeit: Real;Gibt die Schichtzeit als TDateTime zurück
+arbeit.pas;-;TTT_GetTPMSchichtDatum;Real;Schicht: Integer; DatumZeit: Real;Gibt das Schichtdatum zurück
+arbeit.pas;-;TTT_GetArbeitszeit_Schicht;Integer;qSuch4: TCO_Query; MaschNr: Integer; Datum: Real; Schicht: Integer;Berechnet die Arbeitszeit pro Schicht für eine Maschine
+arbeit.pas;-;TTT_GetSchichtTyp;string;qSuch4: TCO_Query; MaschNr: Integer; Datum: Real; Schicht: Integer;Gibt den Schichttyp (z. B. "Früh", "Spät") zurück
+arbeit.pas;-;TTT_InsertStillstandEvent;-;qUpdate: TCO_Query; aMaschNr: string;Fügt ein Stillstands-Event in die Datenbank ein
+arbeit.pas;-;TTT_GetSignalNr;Integer;SignalArt: Integer;Gibt die Signalnummer für eine Signalart zurück
+arbeit.pas;-;TTT_GetMonatStr;string;Datum: TDateTime;Gibt den Monatsnamen (z. B. "Januar") zurück
+arbeit.pas;-;TTT_ErstelldatumEinfuegen;-;qUpdate, qSuch3: TCO_Query; Aufruf: Integer;Fügt Erstellungsdaten in Stillstands-Logs ein
+arbeit.pas;-;TTT_GetRuestStillstandUeberschreitung;Integer;aqUpdate, aqSuch: TCO_Query; aMaschNr: Integer; aLizenz: string;Prüft, ob die Rüstzeit-Überschreitung vorliegt
+arbeit.pas;-;VerpacktProtAusAusschussRechnen;-;aQSuch, aQSuch2, aQUpdate: TCO_Query; aDBUser: string;Berechnet Verpackte Mengen aus Ausschuss
+arbeit.pas;-;VerpacktProtAusAusschussRechnen;-;aQSuch, aQSuch2, aQUpdate: TCO_Query; aDBUser: string; fromDate: TDateTime;Wie oben, aber ab einem bestimmten Datum
+arbeit.pas;-;GFloat;Real;H: string;Konvertiert einen String in einen Real-Wert (mit Fehlerbehandlung für Dezimaltrennzeichen)
+arbeit.pas;-;GetMonat;string;Datum: TDateTime;Gibt den Monat als String zurück (z. B. "01" für Januar)
+arbeit.pas;-;GetQuartal;string;Datum: TDateTime;Gibt das Quartal zurück (z. B. "1" für Q1)
+arbeit.pas;-;GetJahr;string;Datum: TDateTime;Gibt das Jahr zurück (z. B. "2024")
+arbeit.pas;-;GetAktion;Integer;Stillstandnr: Integer;Gibt die Aktion für eine Stillstandsnummer zurück
+arbeit.pas;-;GetSignalStillstand;Integer;Datenblock: Integer;Gibt die Signalnummer für Stillstand einer Maschine zurück
+arbeit.pas;-;GetKWStr;string;Datum: TDateTime;Gibt die Kalenderwoche als String zurück (z. B. "25")
+arbeit.pas;-;GetKW;string;Datum: TDateTime;Wie GetKWStr, aber ggf. mit anderen Formatierungen
+arbeit.pas;-;Format_String;Integer;Wert: string;Konvertiert einen String in einen Integer (mit Fehlerbehandlung)
+arbeit.pas;-;Pause;-;Sek: Integer;Pause für Sek Sekunden (Sleep)
+arbeit.pas;-;GetSelectedMaschinen;string;Q: TCO_Query; AndStr, Feld, Liste: string; Style: Integer;Gibt eine SQL-Bedingung für ausgewählte Maschinen zurück
+arbeit.pas;-;Statistik_Berechnen;-;-;Berechnet Statistiken (z. B. für Reports)
+arbeit.pas;-;CCC_Proc_Ruesten_AutoBuchen;-;-;Automatische Rüstzeit-Buchung
+arbeit.pas;-;GetPersonalNr_Signal;-;-;Liest Personalnummern-Signale aus der SPS
+arbeit.pas;-;GetAusschuss_Signal;-;-;Liest Ausschuss-Signale aus der SPS
+arbeit.pas;-;CheckCO_DatabaseConnect;Boolean;C: TCO_Database; Q: TCO_Query; LogId: Integer; thread: string;Prüft die Datenbankverbindung für eine bestimmte Komponente
+arbeit.pas;-;N_o_w;TDateTime;-;Funktion: Gibt die aktuelle Zeit (Now) zurück (ggf. mit Zeitzonenanpassung)
+comtas_h.pas;-;Konstanten;-;-;Definiert Status-Konstanten (stLaeuftInt=0, stStartRuestenInt=1, etc.) und Stillstandsgruppen (CANLAGENAUSFALL=0, CRUESTEN=1, etc.)
+utils.pas;-;EnumProcesses;-;-;Listet alle laufenden Prozesse mit Speicherverbrauch auf (für Debugging)
+utils.pas;-;EnumProcess;string;ProcessName: string;Gibt den Speicherverbrauch eines bestimmten Prozesses zurück
+utils.pas;-;ProcessMemory_KB;string;id: Cardinal;Gibt den Speicherverbrauch eines Prozesses mit der ID id zurück
+utils.pas;-;GetComputerNetName;string;-;Gibt den Computernamen zurück
+utils.pas;-;LogUsrEvent;-;Query: TCO_Query; eventId: Integer; EventToken: string; BAnr, Artikel, Lizenz, Werkzeug, Neu: string; prod: integer; Alt: string = ''; Notice: string = ''; RefNo: string = '';Schreibt ein Benutzer-Event in die USR_EVENTLOG-Tabelle
+utils.pas;-;LogUsrEvent;-;searchQuery, updateQuery: TCO_Query; eventId: Integer; EventToken: string; BAnr, Neu: string; Alt: string = ''; Notice: string = ''; RefNo: string = '';Wie oben, aber mit separaten Queries für Suche und Update
+utils.pas;-;FloatToPunktString;string;aFloat: Extended;Konvertiert einen Extended-Wert in einen String mit Punkt als Dezimaltrennzeichen
+utils.pas;-;ChangeDtCode;-;updateQuery: TCO_Query; stillstandnr, stillogNr: Integer; usrEventLog: Boolean; comment: string = '';Ändert den Stillstandscode in TPM_Stillog und loggt ggf. das Event
+utils.pas;-;ChangeDtCode;-;query: TCO_Query; stillstandnr, stillogNr: Integer; usrEventlog, autoBuchung, reaktionszeit: Boolean; comment: string = '';Wie oben, mit zusätzlichen Optionen für AutoBuchung und Reaktionszeit
+utils.pas;-;ChangeDtCode;-;updateQuery: TCO_Query; stillstandnr, stillogNr: Integer; stillogQuery: TCO_Query; comment: string = '';Wie oben, aber mit separatem Query für Stillog-Daten
+utils.pas;-;LogAndChangeDtCode;-;updateQuery: TCO_Query; stillstandnr, stillogNr: Integer; stillogQuery: TCO_Query; autoBuchung, Reaktionszeit: Boolean; comment: string = '';Loggt und ändert den Stillstandscode
+utils.pas;-;LogDtChangeEvent;-;stillogQuery, updateQuery: TCO_Query; stillogNr: Integer; comment: string = '';Loggt eine Stillstandsänderung in USR_EVENTLOG
